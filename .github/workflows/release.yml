@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore Vimon.sln
+
+      - name: Build
+        run: dotnet build Vimon.sln -c Release --no-restore
+
+      - name: Publish Windows x64
+        run: >
+          dotnet publish
+          .\src\Vimon.Cli\Vimon.Cli.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o .\dist\win-x64
+
+      - name: Rename binary
+        shell: pwsh
+        run: |
+          Copy-Item ".\dist\win-x64\vimon.exe" ".\dist\vimon-windows-x64.exe"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/vimon-windows-x64.exe
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
