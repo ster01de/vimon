@@ -1,0 +1,24 @@
+{
+  "name": "silent",
+  "description": "Flags inefficient heat/noise earlier",
+  "cpu": {
+    "warnC": 75,
+    "criticalC": 88
+  },
+  "gpu": {
+    "warnC": 76,
+    "criticalC": 84
+  },
+  "hotspot": {
+    "warnC": 90,
+    "criticalC": 102
+  },
+  "memoryTemp": {
+    "warnC": 92,
+    "criticalC": 102
+  },
+  "ram": {
+    "warnPct": 85,
+    "criticalPct": 95
+  }
+}

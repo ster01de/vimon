@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>vimon</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Vimon.Core\Vimon.Core.csproj" />
+    <ProjectReference Include="..\Vimon.Platform.Windows\Vimon.Platform.Windows.csproj" />
+  </ItemGroup>
+</Project>

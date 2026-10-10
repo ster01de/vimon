@@ -1,0 +1,25 @@
+{
+  "name": "ai-workstation",
+  "description": "Sustained compute profile; prioritizes thermals, VRAM and PCIe state",
+  "cpu": {
+    "warnC": 82,
+    "criticalC": 92
+  },
+  "gpu": {
+    "warnC": 80,
+    "criticalC": 85
+  },
+  "hotspot": {
+    "warnC": 95,
+    "criticalC": 105
+  },
+  "memoryTemp": {
+    "warnC": 95,
+    "criticalC": 105
+  },
+  "ram": {
+    "warnPct": 88,
+    "criticalPct": 96
+  },
+  "notes": "Model/vendor specific overrides planned."
+}

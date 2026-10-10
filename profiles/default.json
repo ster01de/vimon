@@ -1,0 +1,24 @@
+{
+  "name": "default",
+  "description": "Balanced general-purpose thresholds",
+  "cpu": {
+    "warnC": 80,
+    "criticalC": 90
+  },
+  "gpu": {
+    "warnC": 80,
+    "criticalC": 85
+  },
+  "hotspot": {
+    "warnC": 95,
+    "criticalC": 105
+  },
+  "memoryTemp": {
+    "warnC": 95,
+    "criticalC": 105
+  },
+  "ram": {
+    "warnPct": 85,
+    "criticalPct": 95
+  }
+}
