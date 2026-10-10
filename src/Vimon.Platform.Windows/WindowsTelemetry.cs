@@ -21,25 +21,39 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
 
     public SystemSnapshot Read()
     {
-        foreach (var hw in _computer.Hardware) Update(hw);
+        foreach (var hw in _computer.Hardware)
+            Update(hw);
+
         var all = Flatten(_computer.Hardware).ToList();
 
         var cpuHw = all.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
+
         var cpu = cpuHw is null ? null : new CpuMetrics(
             cpuHw.Name,
-            Find(cpuHw, SensorType.Temperature, "CPU Package", "CPU (Tctl/Tdie)", "Core (Tctl/Tdie)"),
-            Find(cpuHw, SensorType.Load, "CPU Total", "Total"),
-            Find(cpuHw, SensorType.Power, "CPU Package", "Package"),
-            Find(cpuHw, SensorType.Clock, "CPU Core #1", "Core #1")
+            FindNamed(cpuHw, SensorType.Temperature, true,
+                "CPU (Tctl/Tdie)", "Core (Tctl/Tdie)", "CPU Package", "Package"),
+            FindNamed(cpuHw, SensorType.Load, false,
+                "CPU Total", "Total"),
+            FindNamed(cpuHw, SensorType.Power, true,
+                "CPU Package", "Package", "CPU PPT", "PPT"),
+            FindNamed(cpuHw, SensorType.Clock, true,
+                "CPU Core #1", "Core #1")
         );
 
-        var pcieRows = QueryNvidiaPcie();
-        var gpuHws = all.Where(h => h.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel).ToList();
+        var nvidiaPcie = QueryNvidiaPcie();
+        int nvidiaIndex = 0;
+
+        var gpuHws = all.Where(h =>
+            h.HardwareType is HardwareType.GpuNvidia
+            or HardwareType.GpuAmd
+            or HardwareType.GpuIntel).ToList();
+
         var gpus = new List<GpuMetrics>();
 
         for (int i = 0; i < gpuHws.Count; i++)
         {
             var h = gpuHws[i];
+
             var vendor = h.HardwareType switch
             {
                 HardwareType.GpuNvidia => Vendor.Nvidia,
@@ -48,92 +62,193 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
                 _ => Vendor.Unknown
             };
 
-            var pcie = vendor == Vendor.Nvidia && i < pcieRows.Count ? pcieRows[i] : default;
+            (int? genCur, int? widthCur, int? genMax, int? widthMax) pcie = default;
+
+            if (vendor == Vendor.Nvidia)
+            {
+                if (nvidiaIndex < nvidiaPcie.Count)
+                    pcie = nvidiaPcie[nvidiaIndex];
+
+                nvidiaIndex++;
+            }
+
             gpus.Add(new GpuMetrics(
-                i, h.Name, vendor,
-                Find(h, SensorType.Temperature, "GPU Core", "GPU Temperature", "Core"),
-                Find(h, SensorType.Temperature, "GPU Hot Spot", "GPU Hotspot", "Hot Spot", "Hotspot"),
-                Find(h, SensorType.Temperature, "GPU Memory Junction", "GPU Memory", "Memory Junction", "Memory"),
-                Find(h, SensorType.Load, "GPU Core", "GPU", "Core"),
-                Find(h, SensorType.Power, "GPU Power", "GPU Package", "Board Power"),
-                Find(h, SensorType.Control, "GPU Fan", "Fan") ?? Find(h, SensorType.Load, "GPU Fan", "Fan"),
-                Find(h, SensorType.Clock, "GPU Core", "Core"),
-                Find(h, SensorType.Clock, "GPU Memory", "Memory"),
-                Find(h, SensorType.SmallData, "GPU Memory Used", "Memory Used") is double usedMb ? usedMb / 1024.0 : null,
-                Find(h, SensorType.SmallData, "GPU Memory Total", "Memory Total") is double totalMb ? totalMb / 1024.0 : null,
-                pcie.genCur, pcie.widthCur, pcie.genMax, pcie.widthMax
+                i,
+                h.Name,
+                vendor,
+                FindNamed(h, SensorType.Temperature, true,
+                    "GPU Core", "GPU Temperature"),
+                FindNamed(h, SensorType.Temperature, true,
+                    "GPU Hot Spot", "GPU Hotspot", "Hot Spot", "Hotspot"),
+                FindNamed(h, SensorType.Temperature, true,
+                    "GPU Memory Junction", "Memory Junction", "GPU Memory"),
+                FindNamed(h, SensorType.Load, false,
+                    "GPU Core", "GPU D3D", "GPU"),
+                FindNamed(h, SensorType.Power, true,
+                    "GPU Power", "GPU Package", "Board Power"),
+                FindNamed(h, SensorType.Control, false,
+                    "GPU Fan", "Fan")
+                    ?? FindNamed(h, SensorType.Load, false,
+                        "GPU Fan", "Fan"),
+                FindNamed(h, SensorType.Clock, true,
+                    "GPU Core", "Core"),
+                FindNamed(h, SensorType.Clock, true,
+                    "GPU Memory", "Memory"),
+                FindNamed(h, SensorType.SmallData, false,
+                    "GPU Memory Used", "Memory Used") is double usedMb
+                        ? usedMb / 1024.0
+                        : null,
+                FindNamed(h, SensorType.SmallData, true,
+                    "GPU Memory Total", "Memory Total") is double totalMb
+                        ? totalMb / 1024.0
+                        : null,
+                pcie.genCur,
+                pcie.widthCur,
+                pcie.genMax,
+                pcie.widthMax
             ));
         }
 
-        var mem = GetMemoryInfo();
-        var storage = all.Where(h => h.HardwareType == HardwareType.Storage)
-            .Select(h => new StorageMetrics(h.Name,
-                h.Sensors.Where(s => s.SensorType == SensorType.Temperature && s.Value.HasValue)
-                    .Select(s => (double?)s.Value!.Value).DefaultIfEmpty(null).Max()))
+        var memory = GetMemoryInfo();
+
+        var storage = all
+            .Where(h => h.HardwareType == HardwareType.Storage)
+            .Select(h => new StorageMetrics(
+                h.Name,
+                FindAnyPositive(h, SensorType.Temperature)))
             .ToList();
 
-        return new(DateTimeOffset.Now, cpu, gpus, mem, storage);
+        return new SystemSnapshot(
+            DateTimeOffset.Now,
+            cpu,
+            gpus,
+            memory,
+            storage
+        );
     }
 
-    private static double? Find(IHardware h, SensorType type, params string[] names)
+    private static double? FindNamed(
+        IHardware hardware,
+        SensorType type,
+        bool positiveOnly,
+        params string[] names)
     {
-        var sensors = h.Sensors.Where(s => s.SensorType == type && s.Value.HasValue).ToList();
-        foreach (var n in names)
+        var sensors = hardware.Sensors
+            .Where(s => s.SensorType == type && s.Value.HasValue)
+            .ToList();
+
+        foreach (var name in names)
         {
-            var hit = sensors.FirstOrDefault(s => s.Name.Contains(n, StringComparison.OrdinalIgnoreCase));
-            if (hit?.Value != null) return hit.Value.Value;
+            var hit = sensors.FirstOrDefault(s =>
+                s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            hit ??= sensors.FirstOrDefault(s =>
+                s.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+
+            if (hit?.Value is float value)
+            {
+                if (float.IsNaN(value) || float.IsInfinity(value))
+                    continue;
+
+                if (positiveOnly && value <= 0)
+                    continue;
+
+                return value;
+            }
         }
-        return sensors.FirstOrDefault()?.Value;
+
+        return null;
     }
 
-    private static void Update(IHardware h)
+    private static double? FindAnyPositive(IHardware hardware, SensorType type)
     {
-        h.Update();
-        foreach (var sub in h.SubHardware) Update(sub);
+        foreach (var sensor in hardware.Sensors
+                     .Where(s => s.SensorType == type && s.Value.HasValue))
+        {
+            float value = sensor.Value!.Value;
+
+            if (!float.IsNaN(value) && !float.IsInfinity(value) && value > 0)
+                return value;
+        }
+
+        return null;
+    }
+
+    private static void Update(IHardware hardware)
+    {
+        hardware.Update();
+
+        foreach (var sub in hardware.SubHardware)
+            Update(sub);
     }
 
     private static IEnumerable<IHardware> Flatten(IEnumerable<IHardware> roots)
     {
-        foreach (var h in roots)
+        foreach (var hardware in roots)
         {
-            yield return h;
-            foreach (var x in Flatten(h.SubHardware)) yield return x;
+            yield return hardware;
+
+            foreach (var sub in Flatten(hardware.SubHardware))
+                yield return sub;
         }
     }
 
-    private static List<(int? genCur,int? widthCur,int? genMax,int? widthMax)> QueryNvidiaPcie()
+    private static List<(int? genCur, int? widthCur, int? genMax, int? widthMax)> QueryNvidiaPcie()
     {
-        var rows = new List<(int?,int?,int?,int?)>();
+        var rows = new List<(int?, int?, int?, int?)>();
+
         try
         {
             var psi = new ProcessStartInfo
             {
                 FileName = "nvidia-smi",
                 Arguments = "--query-gpu=pcie.link.gen.current,pcie.link.width.current,pcie.link.gen.max,pcie.link.width.max --format=csv,noheader,nounits",
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
-            using var p = Process.Start(psi);
-            if (p == null) return rows;
-            var output = p.StandardOutput.ReadToEnd();
-            p.WaitForExit(1200);
+
+            using var process = Process.Start(psi);
+
+            if (process is null)
+                return rows;
+
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit(1200);
+
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                var x = line.Split(',').Select(v => v.Trim()).ToArray();
-                rows.Add(x.Length >= 4 ? (Parse(x[0]),Parse(x[1]),Parse(x[2]),Parse(x[3])) : default);
+                var values = line.Split(',').Select(value => value.Trim()).ToArray();
+
+                rows.Add(values.Length >= 4
+                    ? (Parse(values[0]), Parse(values[1]), Parse(values[2]), Parse(values[3]))
+                    : default);
             }
-        } catch { }
+        }
+        catch
+        {
+            // NVIDIA tooling is optional.
+        }
+
         return rows;
     }
 
-    private static int? Parse(string s) => int.TryParse(s, out var n) ? n : null;
+    private static int? Parse(string value) =>
+        int.TryParse(value, out int number) ? number : null;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private sealed class MEMORYSTATUSEX
     {
         public uint dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
         public uint dwMemoryLoad;
-        public ulong ullTotalPhys, ullAvailPhys, ullTotalPageFile, ullAvailPageFile;
-        public ulong ullTotalVirtual, ullAvailVirtual, ullAvailExtendedVirtual;
+        public ulong ullTotalPhys;
+        public ulong ullAvailPhys;
+        public ulong ullTotalPageFile;
+        public ulong ullAvailPageFile;
+        public ulong ullTotalVirtual;
+        public ulong ullAvailVirtual;
+        public ulong ullAvailExtendedVirtual;
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
@@ -141,12 +256,23 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
 
     private static MemoryMetrics GetMemoryInfo()
     {
-        var m = new MEMORYSTATUSEX();
-        GlobalMemoryStatusEx(m);
-        const double gb = 1024d*1024d*1024d;
-        double total = m.ullTotalPhys/gb, avail = m.ullAvailPhys/gb;
-        double ct = m.ullTotalPageFile/gb, ca = m.ullAvailPageFile/gb;
-        return new(total-avail, total, m.dwMemoryLoad, ct-ca, ct);
+        var memory = new MEMORYSTATUSEX();
+        GlobalMemoryStatusEx(memory);
+
+        const double gb = 1024d * 1024d * 1024d;
+
+        double total = memory.ullTotalPhys / gb;
+        double available = memory.ullAvailPhys / gb;
+        double commitTotal = memory.ullTotalPageFile / gb;
+        double commitAvailable = memory.ullAvailPageFile / gb;
+
+        return new MemoryMetrics(
+            total - available,
+            total,
+            memory.dwMemoryLoad,
+            commitTotal - commitAvailable,
+            commitTotal
+        );
     }
 
     public void Dispose() => _computer.Close();
