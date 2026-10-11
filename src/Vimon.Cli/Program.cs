@@ -12,6 +12,8 @@ using Vimon.Platform.MacOS;
 const int refreshIntervalMs = 500;
 const int keyPollIntervalMs = 25;
 const int onceWarmupMs = 500;
+const int onceRetryMs = 250;
+const int onceMaxWaitMs = 2000;
 
 using IPlatformTelemetry? telemetry = TryCreateTelemetry();
 
@@ -24,18 +26,30 @@ if (telemetry is null)
 Console.OutputEncoding = Encoding.UTF8;
 
 bool hideMissing = args.Contains("--hide-missing");
+bool compact = args.Contains("--compact");
 
 if (args.Contains("--once"))
 {
-    // Some values (e.g. CPU load) are deltas between two samples, so take a warm-up sample first.
+    // CPU load is a delta between two samples. macOS tick counters can stall for ~800 ms, so keep
+    // sampling until load shows up instead of trusting a single warm-up interval.
     telemetry.Read();
     Thread.Sleep(onceWarmupMs);
 
     var snapshot = telemetry.Read();
-    var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
+    long deadline = Environment.TickCount64 + onceMaxWaitMs;
 
-    Console.Write(FrameRenderer.Render(
-        snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-", hideMissing));
+    while (snapshot.Cpu is not null && snapshot.Cpu.LoadPct is null && Environment.TickCount64 < deadline)
+    {
+        Thread.Sleep(onceRetryMs);
+        snapshot = telemetry.Read();
+    }
+    var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
+    var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
+
+    // Compact one-shot output is meant for status bars and scripts, so it is never cut to the window.
+    Console.Write(compact
+        ? CompactRenderer.Render(snapshot, gpu, diagnostics, 0, maxWidth: null)
+        : FrameRenderer.Render(snapshot, gpu, diagnostics, 0, GetSafeWidth(), "-", hideMissing));
     return;
 }
 
@@ -94,14 +108,16 @@ try
                 TryHome();
             }
 
-            string text = FrameRenderer.Render(
-                snapshot,
-                gpu,
-                diagnostics,
-                selectedGpu,
-                width,
-                spinner[frame++ % spinner.Length],
-                hideMissing);
+            string text = compact
+                ? CompactRenderer.Render(snapshot, gpu, diagnostics, selectedGpu, width)
+                : FrameRenderer.Render(
+                    snapshot,
+                    gpu,
+                    diagnostics,
+                    selectedGpu,
+                    width,
+                    spinner[frame++ % spinner.Length],
+                    hideMissing);
 
             var fitted = TerminalFrame.Fit(text, height, lastLineCount);
             Console.Write(fitted.Text);
@@ -123,6 +139,12 @@ try
                 {
                     hideMissing = !hideMissing;
                     end = DateTime.UtcNow; // redraw right away instead of after the refresh interval
+                }
+                else if (key == ConsoleKey.C)
+                {
+                    compact = !compact;
+                    lastWidth = -1; // the layouts differ in width, so start from a cleared screen
+                    end = DateTime.UtcNow;
                 }
                 else if (key == ConsoleKey.RightArrow)
                     selectedGpu++;

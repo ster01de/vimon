@@ -39,6 +39,8 @@ sudo mv vimon /usr/local/bin/
 vimon                   # live view, refreshes every 0.5 s
 vimon --hide-missing    # start with empty rows hidden (toggle with H)
 vimon --once            # one frame, then exit
+vimon --compact         # one- or two-line view (toggle with C)
+vimon --once --compact  # single status line, e.g. for tmux or SketchyBar
 ```
 
 The live view runs in the terminal's alternate screen, like `top`: resizing does not leave copies in the scrollback, and your previous terminal content returns when you quit with `Q`, `Esc` or `Ctrl+C`. Give the window at least ~40 rows to see everything; shorter windows are cut from the bottom, STATUS stays on top.
