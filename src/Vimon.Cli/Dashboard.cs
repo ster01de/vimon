@@ -15,6 +15,7 @@ internal static class Dashboard
     public const string Missing = "—";
 
     private const int LabelWidth = 10;
+    private const int PairGap = 1;
     private const int ValueWidth = 10;
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
@@ -140,7 +141,8 @@ internal static class Dashboard
         if (o.HideMissing && rows.All(row => row.Value is null))
             return null;
 
-        return Section("STORAGE", subtitle: null, MetricsGrid(rows, o.HideMissing));
+        // Drive names vary a lot in length (e.g. "Samsung SSD 980 PRO 1TB"), so the label column adapts.
+        return Section("STORAGE", subtitle: null, MetricsGrid(rows, o.HideMissing, labelWidth: null));
     }
 
     private static Panel Section(string title, string? subtitle, IRenderable content)
@@ -158,10 +160,12 @@ internal static class Dashboard
         };
     }
 
-    private static Grid MetricsGrid(IEnumerable<(string Label, string? Value)> rows, bool hideMissing)
+    /// <param name="labelWidth">Fixed label column so values line up; null sizes it to the longest label.</param>
+    private static Grid MetricsGrid(
+        IEnumerable<(string Label, string? Value)> rows, bool hideMissing, int? labelWidth = LabelWidth)
     {
         var grid = new Grid();
-        grid.AddColumn(new GridColumn { Width = LabelWidth, NoWrap = true });
+        grid.AddColumn(new GridColumn { Width = labelWidth, NoWrap = true });
         grid.AddColumn(new GridColumn());
 
         foreach (var (label, value) in rows)
@@ -177,14 +181,18 @@ internal static class Dashboard
         return grid;
     }
 
+    /// <summary>Two panels splitting the window evenly, or stacked below <see cref="SideBySideMinWidth"/>.</summary>
     private static IRenderable Pair(IRenderable left, IRenderable right, int width)
     {
         if (width < SideBySideMinWidth)
             return new Rows(left, right);
 
-        var grid = new Grid { Expand = true };
-        grid.AddColumn();
-        grid.AddColumn();
+        int leftWidth = (width - PairGap) / 2;
+        int rightWidth = width - PairGap - leftWidth;
+
+        var grid = new Grid();
+        grid.AddColumn(new GridColumn { Width = leftWidth, Padding = new Padding(0, 0, PairGap, 0) });
+        grid.AddColumn(new GridColumn { Width = rightWidth, Padding = new Padding(0) });
         grid.AddRow(left, right);
         return grid;
     }
