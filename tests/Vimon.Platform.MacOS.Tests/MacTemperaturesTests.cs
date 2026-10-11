@@ -5,17 +5,18 @@ namespace Vimon.Platform.MacOS.Tests;
 public class MacTemperaturesTests
 {
     [Theory]
-    [InlineData("Tp0A", true, SmcSensorGroup.Cpu)]
-    [InlineData("Te05", true, SmcSensorGroup.Cpu)]
-    [InlineData("Tg0f", true, SmcSensorGroup.Gpu)]
+    // Expected group as text: a public test method cannot take the internal enum as a parameter.
+    [InlineData("Tp0A", true, "Cpu")]
+    [InlineData("Te05", true, "Cpu")]
+    [InlineData("Tg0f", true, "Gpu")]
     [InlineData("TC0P", true, null)]
     [InlineData("TG0D", true, null)]
-    [InlineData("TC0P", false, SmcSensorGroup.Cpu)]
-    [InlineData("TG0D", false, SmcSensorGroup.Gpu)]
+    [InlineData("TC0P", false, "Cpu")]
+    [InlineData("TG0D", false, "Gpu")]
     [InlineData("Tp0P", false, null)]
     [InlineData("TB0T", true, null)]
-    public void ClassifiesSensorKeysPerArchitecture(string key, bool isAppleSilicon, SmcSensorGroup? expected) =>
-        Assert.Equal(expected, MacTemperatures.Classify(key, isAppleSilicon));
+    public void ClassifiesSensorKeysPerArchitecture(string key, bool isAppleSilicon, string? expectedGroup) =>
+        Assert.Equal(expectedGroup, MacTemperatures.Classify(key, isAppleSilicon)?.ToString());
 
     [Fact]
     public void AveragesCpuAndReportsGpuAverageAndMax()
