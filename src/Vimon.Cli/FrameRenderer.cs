@@ -8,16 +8,20 @@ internal static class FrameRenderer
 {
     public const int MinWidth = 42;
     public const int MaxWidth = 96;
+    public const string Missing = "—";
     private const int MaxStorageRows = 3;
     private const int MaxStatusRows = 3;
+    private const int LabelWidth = 12;
 
+    /// <param name="hideMissing">Drop rows whose value is <see cref="Missing"/>, and sections left empty.</param>
     public static string Render(
         SystemSnapshot s,
         GpuMetrics? gpu,
         IReadOnlyList<Diagnostic> diagnostics,
         int selectedGpu,
         int width,
-        string spin)
+        string spin,
+        bool hideMissing = false)
     {
         int w = Math.Clamp(width, MinWidth, MaxWidth);
         var b = new StringBuilder();
@@ -36,12 +40,20 @@ internal static class FrameRenderer
             b.Append('|').Append(t.PadRight(inner)).AppendLine("|");
         }
 
+        void Metric(string label, string value)
+        {
+            if (hideMissing && value == Missing)
+                return;
+
+            Row($"{label.PadRight(LabelWidth)}{value}");
+        }
+
         string Short(string value, int max) =>
             value.Length <= max ? value : value[..Math.Max(1, max - 1)] + "…";
 
         Border();
-        Row($"VIMON  {spin} LIVE");
-        Row("Q quit  P pause  <- / -> GPU");
+        Row(hideMissing ? $"VIMON  {spin} LIVE  (empty rows hidden)" : $"VIMON  {spin} LIVE");
+        Row("Q quit  P pause  H hide —  <- / -> GPU");
         Border();
 
         // Status first: in short terminals the frame is truncated from the bottom.
@@ -53,12 +65,12 @@ internal static class FrameRenderer
 
         Row("CPU");
         Row(Short(s.Cpu?.Name ?? "Unknown CPU", w - 4));
-        Row($"Temp        {FmtMetric(s.Cpu?.TempC, " C", positiveOnly: true)}");
-        Row($"Load        {FmtMetric(s.Cpu?.LoadPct, " %")}");
-        Row($"Power       {FmtMetric(s.Cpu?.PackagePowerW, " W", positiveOnly: true)}");
+        Metric("Temp", FmtMetric(s.Cpu?.TempC, " C", positiveOnly: true));
+        Metric("Load", FmtMetric(s.Cpu?.LoadPct, " %"));
+        Metric("Power", FmtMetric(s.Cpu?.PackagePowerW, " W", positiveOnly: true));
 
         if (s.Thermal is ThermalState thermal)
-            Row($"Thermal     {thermal}");
+            Metric("Thermal", thermal.ToString());
 
         Border();
 
@@ -71,36 +83,46 @@ internal static class FrameRenderer
         else
         {
             Row(Short(gpu.Name, w - 4));
-            Row($"Core        {FmtMetric(gpu.CoreTempC, " C", positiveOnly: true)}");
-            Row($"Hotspot     {FmtMetric(gpu.HotspotTempC, " C", positiveOnly: true)}");
-            Row($"VRAM temp   {FmtMetric(gpu.MemoryTempC, " C", positiveOnly: true)}");
-            Row($"Load        {FmtMetric(gpu.UtilizationPct, " %")}");
-            Row($"Memory      {GpuMemory(gpu)}");
-            Row($"Power       {FmtMetric(gpu.PowerW, " W", positiveOnly: true)}");
-            Row($"Fan         {FmtMetric(gpu.FanPct, " %")}");
-            Row($"PCIe        {Pcie(gpu)}");
+            Metric("Core", FmtMetric(gpu.CoreTempC, " C", positiveOnly: true));
+            Metric("Hotspot", FmtMetric(gpu.HotspotTempC, " C", positiveOnly: true));
+            Metric("VRAM temp", FmtMetric(gpu.MemoryTempC, " C", positiveOnly: true));
+            Metric("Load", FmtMetric(gpu.UtilizationPct, " %"));
+            Metric("Memory", GpuMemory(gpu));
+            Metric("Power", FmtMetric(gpu.PowerW, " W", positiveOnly: true));
+            Metric("Fan", FmtMetric(gpu.FanPct, " %"));
+            Metric("PCIe", Pcie(gpu));
         }
 
         Border();
 
         Row("MEMORY");
-        Row($"RAM         {s.Memory.UsedGb:0.0} / {s.Memory.TotalGb:0.0} GB");
-        Row($"Usage       {s.Memory.LoadPct:0} %");
+        Metric("RAM", $"{s.Memory.UsedGb:0.0} / {s.Memory.TotalGb:0.0} GB");
+        Metric("Usage", $"{s.Memory.LoadPct:0} %");
 
         if (s.Memory.Pressure is MemoryPressure pressure)
-            Row($"Pressure    {pressure}");
+            Metric("Pressure", pressure.ToString());
 
         Border();
 
+        var drives = s.Storage
+            .Take(MaxStorageRows)
+            .Select(drive => (drive.Name, Temp: FmtMetric(drive.TempC, " C", positiveOnly: true)))
+            .Where(drive => !hideMissing || drive.Temp != Missing)
+            .ToList();
+
+        // Without any drive temperature the whole section carries no information.
+        if (hideMissing && drives.Count == 0)
+            return b.ToString();
+
         Row("STORAGE");
-        if (s.Storage.Count == 0)
+        if (drives.Count == 0)
         {
-            Row("Temperature —");
+            Row($"Temperature {Missing}");
         }
         else
         {
-            foreach (var drive in s.Storage.Take(MaxStorageRows))
-                Row($"{Short(drive.Name, Math.Max(12, w - 20))}  {FmtMetric(drive.TempC, " C", positiveOnly: true)}");
+            foreach (var (name, temp) in drives)
+                Row($"{Short(name, Math.Max(12, w - 20))}  {temp}");
         }
 
         Border();

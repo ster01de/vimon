@@ -23,6 +23,8 @@ if (telemetry is null)
 
 Console.OutputEncoding = Encoding.UTF8;
 
+bool hideMissing = args.Contains("--hide-missing");
+
 if (args.Contains("--once"))
 {
     // Some values (e.g. CPU load) are deltas between two samples, so take a warm-up sample first.
@@ -32,7 +34,8 @@ if (args.Contains("--once"))
     var snapshot = telemetry.Read();
     var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
 
-    Console.Write(FrameRenderer.Render(snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-"));
+    Console.Write(FrameRenderer.Render(
+        snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-", hideMissing));
     return;
 }
 
@@ -52,6 +55,12 @@ Console.CancelKeyPress += (_, e) =>
     e.Cancel = true;
     running = false;
 };
+
+bool useAlternateScreen = TerminalScreen.ShouldUseAlternateScreen(
+    OperatingSystem.IsWindows(), Console.IsOutputRedirected);
+
+if (useAlternateScreen)
+    Console.Write(TerminalScreen.EnterAlternateScreen);
 
 Console.CursorVisible = false;
 
@@ -91,7 +100,8 @@ try
                 diagnostics,
                 selectedGpu,
                 width,
-                spinner[frame++ % spinner.Length]);
+                spinner[frame++ % spinner.Length],
+                hideMissing);
 
             var fitted = TerminalFrame.Fit(text, height, lastLineCount);
             Console.Write(fitted.Text);
@@ -109,6 +119,11 @@ try
                     running = false;
                 else if (key is ConsoleKey.P or ConsoleKey.Spacebar)
                     paused = !paused;
+                else if (key == ConsoleKey.H)
+                {
+                    hideMissing = !hideMissing;
+                    end = DateTime.UtcNow; // redraw right away instead of after the refresh interval
+                }
                 else if (key == ConsoleKey.RightArrow)
                     selectedGpu++;
                 else if (key == ConsoleKey.LeftArrow)
@@ -122,7 +137,12 @@ try
 finally
 {
     Console.CursorVisible = true;
-    TryClear();
+
+    // Leaving the alternate screen restores the terminal content from before vimon started.
+    if (useAlternateScreen)
+        Console.Write(TerminalScreen.LeaveAlternateScreen);
+    else
+        TryClear();
 }
 
 static IPlatformTelemetry? TryCreateTelemetry()
@@ -160,10 +180,11 @@ static int GetSafeWidth()
     catch { return 80; }
 }
 
+// Visible rows, or 0 when the terminal does not report its size (TerminalFrame then skips truncation).
 static int GetSafeHeight()
 {
-    try { return Math.Max(1, Console.WindowHeight); }
-    catch { return 25; }
+    try { return Math.Max(0, Console.WindowHeight); }
+    catch { return 0; }
 }
 
 static void TryHome()

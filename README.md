@@ -180,7 +180,15 @@ Run from source:
 ← / →   switch GPU
 P        pause
 Space    pause
+H        hide / show rows without a value (—)
 Q / Esc  quit
+```
+
+Options:
+
+```text
+--once           print one frame and exit
+--hide-missing   start with rows without a value hidden
 ```
 
 ---

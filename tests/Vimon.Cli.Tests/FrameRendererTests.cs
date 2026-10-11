@@ -17,14 +17,15 @@ public class FrameRendererTests
             memoryUsedGb, memoryTotalGb,
             null, null, null, null);
 
-    private static string Render(SystemSnapshot snapshot) =>
+    private static string Render(SystemSnapshot snapshot, bool hideMissing = false) =>
         FrameRenderer.Render(
             snapshot,
             snapshot.Gpus.FirstOrDefault(),
             DiagnosticsEngine.Evaluate(snapshot),
             selectedGpu: 0,
             Width,
-            "-");
+            "-",
+            hideMissing);
 
     private static string RowValue(string frame, string label) =>
         frame.Split(Environment.NewLine)
@@ -89,6 +90,54 @@ public class FrameRendererTests
         // so truncation in short terminals never hides the health verdict.
         Assert.Equal(4, status);
         Assert.True(cpu > status);
+    }
+
+    [Fact]
+    public void HidesRowsWithoutValueWhenRequested()
+    {
+        // Test GPU: core temp, load, power and fan are set; hotspot, VRAM temp, memory and PCIe are not.
+        var snapshot = Snapshot(Gpu(memoryUsedGb: null, memoryTotalGb: null));
+
+        string frame = Render(snapshot, hideMissing: true);
+
+        Assert.DoesNotContain(FrameRenderer.Missing, frame.Replace("H hide —", ""));
+        Assert.DoesNotContain("Hotspot", frame);
+        Assert.DoesNotContain("PCIe", frame);
+        Assert.Equal($"{60:0.#} C", RowValue(frame, "Core"));
+        Assert.Contains("(empty rows hidden)", frame);
+    }
+
+    [Fact]
+    public void DropsStorageSectionWhenNoDriveReportsATemperature()
+    {
+        var withDrive = Snapshot() with { Storage = [new StorageMetrics("Test SSD", null)] };
+
+        Assert.Contains("STORAGE", Render(withDrive));
+        Assert.DoesNotContain("STORAGE", Render(withDrive, hideMissing: true));
+        Assert.DoesNotContain("STORAGE", Render(Snapshot(), hideMissing: true));
+    }
+
+    [Fact]
+    public void KeepsDrivesThatReportATemperatureWhenHiding()
+    {
+        var snapshot = Snapshot() with
+        {
+            Storage = [new StorageMetrics("Hot SSD", 41), new StorageMetrics("Cold HDD", null)]
+        };
+
+        string frame = Render(snapshot, hideMissing: true);
+
+        Assert.Contains("Hot SSD", frame);
+        Assert.DoesNotContain("Cold HDD", frame);
+    }
+
+    [Fact]
+    public void ShowsMissingValuesByDefault()
+    {
+        string frame = Render(Snapshot(Gpu(memoryUsedGb: null, memoryTotalGb: null)));
+
+        Assert.Equal(FrameRenderer.Missing, RowValue(frame, "Hotspot"));
+        Assert.DoesNotContain("(empty rows hidden)", frame);
     }
 
     [Fact]
