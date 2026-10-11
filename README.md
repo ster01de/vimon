@@ -11,7 +11,7 @@ A focused terminal monitor for the hardware metrics that actually matter.
 ![Vimon demo](docs/assets/vimon-hero.gif)
 
 [![status](https://img.shields.io/badge/status-alpha-7CFF6B)](#roadmap)
-[![platform](https://img.shields.io/badge/platform-Windows%20alpha%20%7C%20Linux%20planned%20%7C%20macOS%20planned-lightgrey)](#platforms)
+[![platform](https://img.shields.io/badge/platform-Windows%20alpha%20%7C%20macOS%20alpha%20%7C%20Linux%20planned-lightgrey)](#platforms)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8-purple)](https://dotnet.microsoft.com/)
 
@@ -112,8 +112,8 @@ Vimon
 │   └── terminal UI
 └── platform backends
     ├── Windows      alpha
-    ├── Linux        planned
-    └── macOS        planned
+    ├── macOS        alpha
+    └── Linux        planned
 ```
 
 GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design.
@@ -128,6 +128,27 @@ Included:
 - `ai-workstation`
 
 Thresholds are intentionally conservative in alpha. Vendor/model-specific overrides are planned.
+
+---
+
+## Download
+
+Prebuilt binaries are attached to every [GitHub release](../../releases). They are self-contained: no .NET install needed.
+
+| Platform | File |
+|---|---|
+| Windows x64 | `vimon-windows-x64.exe` |
+| macOS Apple Silicon | `vimon-macos-arm64.tar.gz` |
+| macOS Intel | `vimon-macos-x64.tar.gz` |
+
+macOS binaries are not notarized yet, so remove the download quarantine once:
+
+```bash
+tar -xzf vimon-macos-arm64.tar.gz
+xattr -d com.apple.quarantine vimon
+./vimon            # live view
+./vimon --once     # print one frame and exit
+```
 
 ---
 
@@ -169,8 +190,8 @@ Q / Esc  quit
 | Platform | Status | Backend |
 |---|---|---|
 | Windows | 🟢 Alpha | LibreHardwareMonitor + vendor tools |
+| macOS | 🟢 Alpha | Public APIs only: CPU load, RAM + memory pressure, thermal state, GPU load + memory. Temperatures and power are planned. |
 | Linux | 🟡 Planned | `/sys/class/hwmon`, `/proc`, DRM/sysfs, vendor tools |
-| macOS | 🟡 Planned | Apple Silicon telemetry, memory pressure, thermal state |
 
 ---
 
