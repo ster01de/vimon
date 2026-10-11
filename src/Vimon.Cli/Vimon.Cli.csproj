@@ -10,6 +10,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Vimon.Core\Vimon.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Vimon.Cli.Tests" />
+  </ItemGroup>
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
     <ProjectReference Include="..\Vimon.Platform.Windows\Vimon.Platform.Windows.csproj" />
   </ItemGroup>

@@ -31,6 +31,7 @@ jobs:
       - run: dotnet build src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0
       - run: dotnet test tests/Vimon.Core.Tests/Vimon.Core.Tests.csproj -c Release
       - run: dotnet test tests/Vimon.Platform.MacOS.Tests/Vimon.Platform.MacOS.Tests.csproj -c Release
+      - run: dotnet test tests/Vimon.Cli.Tests/Vimon.Cli.Tests.csproj -c Release
       - name: Smoke test one-shot output
         run: |
           output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build -- --once)
