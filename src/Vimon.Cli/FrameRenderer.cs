@@ -44,6 +44,13 @@ internal static class FrameRenderer
         Row("Q quit  P pause  <- / -> GPU");
         Border();
 
+        // Status first: in short terminals the frame is truncated from the bottom.
+        Row("STATUS");
+        foreach (var diagnostic in diagnostics.Take(MaxStatusRows))
+            Row(Short($"{diagnostic.Level}: {diagnostic.Message}", w - 4));
+
+        Border();
+
         Row("CPU");
         Row(Short(s.Cpu?.Name ?? "Unknown CPU", w - 4));
         Row($"Temp        {FmtMetric(s.Cpu?.TempC, " C", positiveOnly: true)}");
@@ -95,12 +102,6 @@ internal static class FrameRenderer
             foreach (var drive in s.Storage.Take(MaxStorageRows))
                 Row($"{Short(drive.Name, Math.Max(12, w - 20))}  {FmtMetric(drive.TempC, " C", positiveOnly: true)}");
         }
-
-        Border();
-
-        Row("STATUS");
-        foreach (var diagnostic in diagnostics.Take(MaxStatusRows))
-            Row(Short($"{diagnostic.Level}: {diagnostic.Message}", w - 4));
 
         Border();
 

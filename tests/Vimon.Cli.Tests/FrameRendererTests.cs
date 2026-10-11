@@ -76,6 +76,22 @@ public class FrameRendererTests
     }
 
     [Fact]
+    public void ShowsStatusDirectlyBelowTheHeader()
+    {
+        var lines = Render(Snapshot()).Split(Environment.NewLine)
+            .Select(line => line.Trim('|').Trim())
+            .ToList();
+
+        int status = lines.IndexOf("STATUS");
+        int cpu = lines.IndexOf("CPU");
+
+        // Header is border, title, key hints, border: STATUS must be the first section after it,
+        // so truncation in short terminals never hides the health verdict.
+        Assert.Equal(4, status);
+        Assert.True(cpu > status);
+    }
+
+    [Fact]
     public void KeepsEveryLineAtTheRequestedWidth()
     {
         string frame = Render(Snapshot(Gpu(memoryUsedGb: 1.5, memoryTotalGb: 24)));
