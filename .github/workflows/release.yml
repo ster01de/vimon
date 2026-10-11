@@ -32,6 +32,7 @@ jobs:
           dotnet publish
           .\src\Vimon.Cli\Vimon.Cli.csproj
           -c Release
+          -f net8.0-windows
           -r win-x64
           --self-contained true
           -p:PublishSingleFile=true

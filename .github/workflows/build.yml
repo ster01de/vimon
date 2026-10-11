@@ -17,3 +17,23 @@ jobs:
       - run: dotnet restore Vimon.sln
       - run: dotnet build Vimon.sln -c Release --no-restore
       - run: dotnet test Vimon.sln -c Release --no-build
+
+  macos:
+    runs-on: macos-latest
+    env:
+      # Restore evaluates every CLI target framework, including net8.0-windows.
+      EnableWindowsTargeting: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0
+      - run: dotnet test tests/Vimon.Core.Tests/Vimon.Core.Tests.csproj -c Release
+      - name: Smoke test CLI startup
+        run: |
+          set +e
+          output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build 2>&1)
+          code=$?
+          echo "$output"
+          test "$code" -eq 1 && grep -q "macOS backend is not implemented yet" <<< "$output"
