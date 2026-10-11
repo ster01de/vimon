@@ -1,6 +1,20 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Vimon.Core;
+#if WINDOWS
 using Vimon.Platform.Windows;
+#else
+using Vimon.Platform.Linux;
+using Vimon.Platform.MacOS;
+#endif
+
+using IPlatformTelemetry? telemetry = TryCreateTelemetry();
+
+if (telemetry is null)
+{
+    Environment.ExitCode = 1;
+    return;
+}
 
 Console.OutputEncoding = Encoding.UTF8;
 Console.CursorVisible = false;
@@ -12,8 +26,6 @@ int frame = 0;
 int lastWidth = -1;
 int lastHeight = -1;
 string[] spinner = ["|", "/", "-", "\\"];
-
-using IPlatformTelemetry telemetry = new WindowsTelemetry();
 
 try
 {
@@ -79,6 +91,35 @@ finally
 {
     Console.CursorVisible = true;
     TryClear();
+}
+
+static IPlatformTelemetry? TryCreateTelemetry()
+{
+    try
+    {
+        return CreateTelemetry();
+    }
+    catch (PlatformNotSupportedException ex)
+    {
+        Console.Error.WriteLine($"vimon: {ex.Message}");
+        return null;
+    }
+}
+
+static IPlatformTelemetry CreateTelemetry()
+{
+#if WINDOWS
+    return new WindowsTelemetry();
+#else
+    if (OperatingSystem.IsMacOS())
+        return new MacTelemetry();
+
+    if (OperatingSystem.IsLinux())
+        return new LinuxTelemetry();
+
+    throw new PlatformNotSupportedException(
+        $"{RuntimeInformation.OSDescription} is not supported by this build. Use the Windows release on Windows.");
+#endif
 }
 
 static string Render(
