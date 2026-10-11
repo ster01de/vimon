@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <!--
+      Vimon.Cli also targets net8.0-windows. Restore evaluates every target framework, so without
+      this, `dotnet run` / `dotnet test` on macOS and Linux fail with NETSDK1100.
+      It only allows building the Windows target elsewhere; it does not make it run there.
+    -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>

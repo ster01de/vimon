@@ -6,14 +6,19 @@
 
 A focused terminal monitor for the hardware metrics that actually matter.
 
-`CPU · GPU · VRAM · RAM · PCIe · Power · Thermals`
+`CPU · GPU · VRAM · RAM · PCIe · Thermals`
 
 ![Vimon demo](docs/assets/vimon-hero.gif)
 
-[![status](https://img.shields.io/badge/status-alpha-7CFF6B)](#roadmap)
-[![platform](https://img.shields.io/badge/platform-Windows%20alpha%20%7C%20macOS%20alpha%20%7C%20Linux%20planned-lightgrey)](#platforms)
+<sub>Demo recorded on Windows with the v0.1 layout.</sub>
+
+[![release](https://img.shields.io/github/v/release/ster01de/vimon?include_prereleases&sort=semver&label=release)](https://github.com/ster01de/vimon/releases)
+[![build](https://github.com/ster01de/vimon/actions/workflows/build.yml/badge.svg)](https://github.com/ster01de/vimon/actions/workflows/build.yml)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20planned-lightgrey)](#install)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8-purple)](https://dotnet.microsoft.com/)
+
+[Install](#install) · [What it shows](#what-it-shows) · [Windows](docs/platforms/windows.md) · [macOS](docs/platforms/macos.md) · [Linux](docs/platforms/linux.md) · [Roadmap](#roadmap)
 
 </div>
 
@@ -30,51 +35,144 @@ Vimon does the opposite: it surfaces the handful of metrics that help you decide
 - Is GPU memory getting uncomfortable?
 - Is RAM pressure becoming a problem?
 - Is the GPU actually using the expected PCIe link?
-- Is power sensible for the workload?
 - Is anything worth investigating now?
 
 No 300-row sensor table. No hunting through labels.
 
+```text
++--------------------------------------------------+
+| VIMON  - LIVE  (empty rows hidden)               |
+| Q quit  P pause  H hide —  <- / -> GPU           |
++--------------------------------------------------+
+| STATUS                                           |
+| Warning: OS memory pressure elevated             |
++--------------------------------------------------+
+| CPU                                              |
+| Apple M2                                         |
+| Temp        47.1 C                               |
+| Load        41.5 %                               |
+| Thermal     Nominal                              |
++--------------------------------------------------+
+| GPU 1/1                                          |
+| Apple M2                                         |
+| Core        37.4 C                               |
+| Hotspot     40 C                                 |
+| Load        18 %                                 |
+| Memory      0.4 GB                               |
++--------------------------------------------------+
+| MEMORY                                           |
+| RAM         6.5 / 8.0 GB                         |
+| Usage       81 %                                 |
+| Pressure    Warning                              |
++--------------------------------------------------+
+```
+
+<sub>macOS · Apple M2 · <code>vimon --once --hide-missing</code></sub>
+
 ---
 
-## Current alpha
+## Install
 
-Windows is the first real backend.
+Prebuilt binaries are attached to every [GitHub release](https://github.com/ster01de/vimon/releases). They are self-contained: no .NET install needed.
 
-Vimon currently supports:
-- CPU temp / load / package power
-- NVIDIA / AMD / Intel GPU discovery through LibreHardwareMonitor
-- multi-GPU enumeration
-- GPU core / hotspot / memory temperature when exposed
-- GPU load / power / fan / clocks when exposed
-- NVIDIA PCIe generation + lane width through `nvidia-smi`
-- RAM usage + commit
-- SSD temperature
-- compact diagnostics
-- GPU switching with arrow keys
+### Windows
 
-Missing sensors are shown as `—`, not `0` and not `ERROR`.
+1. Download `vimon-windows-x64.exe` from the [releases](https://github.com/ster01de/vimon/releases).
+2. Run it from a terminal **as administrator**. Without admin rights CPU temperatures and some other sensors stay empty.
+
+The binary is not code-signed yet, so SmartScreen may warn on first start (*More info → Run anyway*).
+
+→ [Windows guide](docs/platforms/windows.md)
+
+### macOS
+
+```bash
+curl -fLO https://github.com/ster01de/vimon/releases/download/v0.3.1-alpha/vimon-macos-arm64.tar.gz
+tar -xzf vimon-macos-arm64.tar.gz
+./vimon
+```
+
+Newer version on the [releases page](https://github.com/ster01de/vimon/releases)? Replace `v0.3.1-alpha` in the URL. `-f` makes `curl` stop on a wrong URL instead of saving GitHub's "Not Found" page, which `tar` would reject with *Unrecognized archive format*.
+
+Use `vimon-macos-x64.tar.gz` on Intel Macs. Downloaded with a browser instead of `curl`? Run `xattr -d com.apple.quarantine vimon` once, because the binaries are not notarized yet.
+
+→ [macOS guide](docs/platforms/macos.md)
+
+### Linux
+
+Not available yet: the Linux backend is planned.
+
+→ [What is planned for Linux](docs/platforms/linux.md)
 
 ---
 
-## Multi-GPU
+## What it shows
 
-Vimon is **not** tied to RTX 3090.
+| Metric | Windows | macOS |
+|---|:---:|:---:|
+| CPU temperature | ✓ ¹ | ✓ |
+| CPU load | ✓ | ✓ |
+| CPU package power | ✓ | — |
+| OS thermal state | — | ✓ |
+| GPU name, multi-GPU switching | ✓ | ✓ |
+| GPU core temperature | ✓ ² | ✓ |
+| GPU hotspot temperature | ✓ ² | ✓ ³ |
+| GPU memory temperature | ✓ ² | — |
+| GPU load | ✓ | ✓ |
+| GPU memory used | ✓ | ✓ ⁴ |
+| GPU power, fan | ✓ ² | — |
+| PCIe link (generation, lanes) | NVIDIA | — |
+| RAM used | ✓ | ✓ |
+| OS memory pressure | — | ✓ |
+| Storage temperature | ✓ | — |
+
+¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU
+
+Missing values are shown as `—`, never as `0` or `ERROR`. Press `H` to hide them.
+
+Linux has no backend yet, see [Linux](docs/platforms/linux.md).
+
+---
+
+## Status checks
+
+The STATUS section sits at the top and lists what is worth a look right now.
+
+| Check | Warning | Critical |
+|---|---|---|
+| CPU temperature | ≥ 80 °C | ≥ 90 °C |
+| GPU core temperature | ≥ 80 °C | ≥ 85 °C |
+| GPU hotspot temperature | ≥ 95 °C | ≥ 105 °C |
+| GPU memory temperature | ≥ 95 °C | ≥ 105 °C |
+| RAM usage | ≥ 85 % | ≥ 95 % |
+| OS memory pressure (macOS) | warning | critical |
+| OS thermal state (macOS) | serious | critical |
+
+PCIe running narrower than supported while the GPU is above 50 % load is reported as info.
+
+Thresholds are conservative and the same for every machine for now. Fanless Apple Silicon laptops can run above 80 °C under sustained load by design, so expect CPU warnings there until per-machine [profiles](profiles/) are loaded.
+
+---
+
+## Controls
 
 ```text
-GPU 1/3  NVIDIA GeForce RTX 3090
-GPU 2/3  NVIDIA GeForce RTX 3060
-GPU 3/3  Intel Graphics
+← / →    switch GPU
+P        pause
+Space    pause
+H        hide / show rows without a value (—)
+Q / Esc  quit
+Ctrl+C   quit
 ```
 
-Use `←` / `→` to switch the focused GPU.
+Options:
 
-Future CLI:
-```bash
-vimon --gpu 0
-vimon --gpu 1
-vimon --gpu all
+```text
+--once           print one frame and exit
+--hide-missing   start with rows without a value hidden
 ```
+
+On macOS the live view uses the terminal's alternate screen, like `top`: your previous terminal content comes back when you quit. If the window is too short, the frame is cut from the bottom with a hint; STATUS always stays visible.
 
 ---
 
@@ -100,151 +198,66 @@ Impact is workload-dependent.
 
 ---
 
+## Build from source
+
+Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
+
+```bash
+# macOS / Linux
+dotnet run --project src/Vimon.Cli -f net8.0
+
+# Windows
+dotnet run --project src/Vimon.Cli -f net8.0-windows
+# or: .\run.ps1, and .\build.ps1 for a single-file vimon.exe
+
+# Tests
+dotnet test
+```
+
+The CLI has two target frameworks: `net8.0-windows` uses the LibreHardwareMonitor backend, `net8.0` the macOS and Linux backends.
+
+---
+
 ## Architecture
 
 ```text
-Vimon
-├── Vimon.Core
-│   ├── sensor models
-│   ├── diagnostics
-│   └── profiles
-├── Vimon.Cli
-│   └── terminal UI
-└── platform backends
-    ├── Windows      alpha
-    ├── macOS        alpha
-    └── Linux        planned
+src/
+├── Vimon.Core               models, diagnostics, nvidia-smi parsing
+├── Vimon.Cli                terminal UI (renderer, window fitting, input loop)
+├── Vimon.Platform.Windows   LibreHardwareMonitor + nvidia-smi
+├── Vimon.Platform.MacOS     Mach, sysctl, IORegistry, SMC, NSProcessInfo
+└── Vimon.Platform.Linux     planned
+tests/
+├── Vimon.Core.Tests
+├── Vimon.Cli.Tests
+└── Vimon.Platform.MacOS.Tests   unit tests + integration tests on real macOS APIs
 ```
 
-GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design.
-
----
-
-## Profiles
-
-Included:
-- `default`
-- `silent`
-- `ai-workstation`
-
-Thresholds are intentionally conservative in alpha. Vendor/model-specific overrides are planned.
-
----
-
-## Download
-
-Prebuilt binaries are attached to every [GitHub release](../../releases). They are self-contained: no .NET install needed.
-
-| Platform | File |
-|---|---|
-| Windows x64 | `vimon-windows-x64.exe` |
-| macOS Apple Silicon | `vimon-macos-arm64.tar.gz` |
-| macOS Intel | `vimon-macos-x64.tar.gz` |
-
-macOS binaries are not notarized yet, so remove the download quarantine once:
-
-```bash
-tar -xzf vimon-macos-arm64.tar.gz
-xattr -d com.apple.quarantine vimon
-./vimon            # live view
-./vimon --once     # print one frame and exit
-```
-
----
-
-## Build
-
-Requires the .NET 8 SDK.
-
-```powershell
-.\build.ps1
-```
-
-Single-file Windows output:
-
-```text
-src\Vimon.Cli\bin\Release\net8.0-windows\win-x64\publish\vimon.exe
-```
-
-Run from source:
-
-```powershell
-.\run.ps1
-```
-
----
-
-## Controls
-
-```text
-← / →   switch GPU
-P        pause
-Space    pause
-H        hide / show rows without a value (—)
-Q / Esc  quit
-```
-
-Options:
-
-```text
---once           print one frame and exit
---hide-missing   start with rows without a value hidden
-```
-
----
-
-## Platforms
-
-| Platform | Status | Backend |
-|---|---|---|
-| Windows | 🟢 Alpha | LibreHardwareMonitor + vendor tools |
-| macOS | 🟢 Alpha | Public APIs only: CPU load, RAM + memory pressure, thermal state, GPU load + memory. Temperatures and power are planned. |
-| Linux | 🟡 Planned | `/sys/class/hwmon`, `/proc`, DRM/sysfs, vendor tools |
+GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design. CI builds and tests every change on Windows and macOS.
 
 ---
 
 ## Roadmap
 
-### v0.1
-- [x] terminal dashboard
-- [x] vendor-neutral GPU model
-- [x] multi-GPU enumeration
-- [x] Windows telemetry backend
-- [x] PCIe status for NVIDIA
-- [x] RAM / storage overview
-- [x] basic diagnostics
-- [ ] hardened sensor mapping
-- [ ] JSON config loading
-- [ ] packaged release artifact
+### Shipped
 
-### v0.2
-- [ ] `--compact`
-- [ ] `--json`
-- [ ] `--log`
-- [ ] `--gpu`
-- [ ] profile loading
-- [ ] vendor/model thermal profiles
-- [ ] CSV/JSON logging
-- [ ] richer diagnostics
+- **v0.1** Windows backend, multi-GPU, NVIDIA PCIe status, basic diagnostics
+- **v0.2.0-alpha** first macOS release: CPU load, RAM, memory pressure, thermal state, GPU load and memory; cross-platform CLI; release binaries for Windows and macOS
+- **v0.3.0-alpha** macOS CPU and GPU temperatures via the SMC, no root needed
+- **v0.3.1-alpha** hide rows without a value (`H`), alternate screen on macOS, status on top, terminal-height aware drawing
 
-### v0.3
-- [ ] Linux backend
-- [ ] NVIDIA / AMD / Intel Linux GPU support
-- [ ] packaged Linux releases
+### Next
 
-### v0.4
-- [ ] macOS backend
-- [ ] Apple Silicon CPU/GPU telemetry
-- [ ] unified-memory pressure
-- [ ] package power
-- [ ] thermal state
+- [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
+- [ ] Network and disk throughput
+- [ ] `--compact` one-line view for small terminals and status bars
+- [ ] `--json` output
+- [ ] Linux backend and Linux release builds
+- [ ] AI section: local inference servers, loaded model, tokens per second
+- [ ] macOS power (CPU, GPU, Neural Engine)
+- [ ] `--gpu` selection, `--log`
 
-### v1.0
-- [ ] Windows / Linux / macOS
-- [ ] stable sensor abstraction
-- [ ] documented configuration
-- [ ] CI release builds
-- [ ] optional compact desktop widget
+What Vimon will not become: see [non-goals](docs/ROADMAP.md).
 
 ---
 
