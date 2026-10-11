@@ -59,6 +59,28 @@ internal static class MacNative
     [DllImport(IOKit)]
     public static extern IntPtr IORegistryEntryCreateCFProperty(uint entry, IntPtr key, IntPtr allocator, uint options);
 
+    /// <remarks>Consumes one reference to <paramref name="matching"/>.</remarks>
+    [DllImport(IOKit)]
+    public static extern uint IOServiceGetMatchingService(uint mainPort, IntPtr matching);
+
+    [DllImport(IOKit)]
+    public static extern int IOServiceOpen(uint service, uint owningTask, uint type, out uint connect);
+
+    [DllImport(IOKit)]
+    public static extern int IOServiceClose(uint connect);
+
+    /// <remarks>Byte arrays are pinned, so the driver writes straight into <paramref name="output"/>.</remarks>
+    [DllImport(IOKit)]
+    public static extern int IOConnectCallStructMethod(
+        uint connection, uint selector, byte[] input, nuint inputSize, byte[] output, ref nuint outputSize);
+
+    /// <summary>mach_task_self() is a macro over the exported variable mach_task_self_.</summary>
+    public static uint MachTaskSelf()
+    {
+        IntPtr library = NativeLibrary.Load(LibSystem);
+        return unchecked((uint)Marshal.ReadInt32(NativeLibrary.GetExport(library, "mach_task_self_")));
+    }
+
     // CoreFoundation
 
     [DllImport(CoreFoundation)]

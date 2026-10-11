@@ -47,6 +47,24 @@ public class MacTelemetryTests
     }
 
     [MacOSFact]
+    public void ReportsPlausibleTemperaturesWhenTheSmcHasThem()
+    {
+        using var telemetry = new MacTelemetry();
+
+        var snapshot = telemetry.Read();
+
+        // VMs may expose no SMC temperature keys, so only reported values are checked.
+        if (snapshot.Cpu?.TempC is double cpuC)
+            Assert.InRange(cpuC, 1, 130);
+
+        foreach (var gpu in snapshot.Gpus)
+        {
+            if (gpu.CoreTempC is double coreC)
+                Assert.InRange(coreC, 1, gpu.HotspotTempC ?? 130);
+        }
+    }
+
+    [MacOSFact]
     public void ReadsThermalState()
     {
         using var telemetry = new MacTelemetry();
