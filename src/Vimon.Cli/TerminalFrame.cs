@@ -9,6 +9,7 @@ internal static class TerminalFrame
     /// Truncates frames taller than the window, keeping one row free so the final newline cannot
     /// scroll the screen, and blanks out rows left over from a taller previous frame.
     /// </summary>
+    /// <param name="windowHeight">Visible rows; 0 or less means unknown, and the frame is not truncated.</param>
     public static FittedFrame Fit(string frame, int windowHeight, int previousLineCount)
     {
         var lines = frame
@@ -20,9 +21,10 @@ internal static class TerminalFrame
             lines.RemoveAt(lines.Count - 1);
 
         int width = lines.Count == 0 ? 0 : lines.Max(line => line.Length);
+        bool isHeightKnown = windowHeight > 0;
         int maxLines = Math.Max(1, windowHeight - 1);
 
-        if (lines.Count > maxLines)
+        if (isHeightKnown && lines.Count > maxLines)
         {
             int keep = maxLines - 1;
             int hidden = lines.Count - keep;

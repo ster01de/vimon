@@ -33,6 +33,20 @@ public class TerminalFrameTests
         Assert.Equal(60, lines[4].Length);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void KeepsWholeFrameWhenWindowHeightIsUnknown(int windowHeight)
+    {
+        // Some pseudo terminals report 0 rows; truncating to that would leave only the hint.
+        string frame = Frame(40);
+
+        var fitted = TerminalFrame.Fit(frame, windowHeight, previousLineCount: 0);
+
+        Assert.Equal(frame, fitted.Text);
+        Assert.Equal(40, fitted.LineCount);
+    }
+
     [Fact]
     public void BlanksRowsLeftOverFromTallerPreviousFrame()
     {

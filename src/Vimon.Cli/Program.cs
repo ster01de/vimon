@@ -180,10 +180,11 @@ static int GetSafeWidth()
     catch { return 80; }
 }
 
+// Visible rows, or 0 when the terminal does not report its size (TerminalFrame then skips truncation).
 static int GetSafeHeight()
 {
-    try { return Math.Max(1, Console.WindowHeight); }
-    catch { return 25; }
+    try { return Math.Max(0, Console.WindowHeight); }
+    catch { return 0; }
 }
 
 static void TryHome()
