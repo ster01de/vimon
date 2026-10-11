@@ -14,6 +14,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
     private readonly MacMemory _memory;
     private readonly MacThermalState _thermal;
     private CpuLoadInfo? _previousCpuTicks;
+    private double? _lastCpuLoadPct;
 
     public MacTelemetry()
     {
@@ -34,21 +35,27 @@ public sealed class MacTelemetry : IPlatformTelemetry
             Thermal = _thermal.Read()
         };
 
-    /// <remarks>Load needs two samples, so the very first read reports it as missing.</remarks>
+    /// <remarks>
+    /// Load needs two samples, so the very first read reports it as missing. Tick counters can lag
+    /// behind short intervals (notably in VMs); then the baseline is kept and the last load repeated.
+    /// </remarks>
     private CpuMetrics ReadCpu()
     {
         uint count = MacNative.HostCpuLoadInfoCount;
-        double? loadPct = null;
 
         if (MacNative.host_statistics(_host, MacNative.HostCpuLoadInfo, out var ticks, ref count) == MacNative.KernSuccess)
         {
-            if (_previousCpuTicks is CpuLoadInfo previous)
-                loadPct = MacCpuLoad.Between(previous, ticks);
+            double? loadPct = _previousCpuTicks is CpuLoadInfo previous
+                ? MacCpuLoad.Between(previous, ticks)
+                : null;
 
-            _previousCpuTicks = ticks;
+            if (loadPct is not null || _previousCpuTicks is null)
+                _previousCpuTicks = ticks;
+
+            _lastCpuLoadPct = loadPct ?? _lastCpuLoadPct;
         }
 
-        return new CpuMetrics(_cpuName, TempC: null, LoadPct: loadPct, PackagePowerW: null, ClockMhz: null);
+        return new CpuMetrics(_cpuName, TempC: null, LoadPct: _lastCpuLoadPct, PackagePowerW: null, ClockMhz: null);
     }
 
     public void Dispose()

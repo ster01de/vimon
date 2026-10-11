@@ -1,9 +1,12 @@
+using Vimon.Core;
+
 namespace Vimon.Platform.MacOS.Tests;
 
 /// <summary>Integration tests against the real macOS APIs of the machine running them.</summary>
 public class MacTelemetryTests
 {
-    private const int SampleIntervalMs = 250;
+    private const int SampleIntervalMs = 100;
+    private const int CpuLoadTimeoutMs = 2000;
 
     [MacOSFact]
     public void ReadsPhysicalMemory()
@@ -20,20 +23,27 @@ public class MacTelemetryTests
     }
 
     [MacOSFact]
-    public void ReadsCpuNameAndLoadFromSecondSample()
+    public void ReadsCpuNameAndLoadOnceTicksElapse()
     {
         using var telemetry = new MacTelemetry();
 
-        var first = telemetry.Read().Cpu;
-        Thread.Sleep(SampleIntervalMs);
-        var second = telemetry.Read().Cpu;
+        CpuMetrics? first = telemetry.Read().Cpu;
+        CpuMetrics? cpu = first;
+        long deadline = Environment.TickCount64 + CpuLoadTimeoutMs;
+
+        // Tick counters can lag behind short intervals in VMs, so poll instead of a fixed sleep.
+        while (cpu?.LoadPct is null && Environment.TickCount64 < deadline)
+        {
+            Thread.Sleep(SampleIntervalMs);
+            cpu = telemetry.Read().Cpu;
+        }
 
         Assert.NotNull(first);
         Assert.Null(first.LoadPct);
-        Assert.NotNull(second);
-        Assert.False(string.IsNullOrWhiteSpace(second.Name));
-        Assert.NotNull(second.LoadPct);
-        Assert.InRange(second.LoadPct.Value, 0, 100);
+        Assert.NotNull(cpu);
+        Assert.False(string.IsNullOrWhiteSpace(cpu.Name));
+        Assert.NotNull(cpu.LoadPct);
+        Assert.InRange(cpu.LoadPct.Value, 0, 100);
     }
 
     [MacOSFact]
