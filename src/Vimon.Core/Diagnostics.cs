@@ -6,39 +6,30 @@ public sealed record Diagnostic(HealthLevel Level, string Code, string Message);
 
 public static class DiagnosticsEngine
 {
-    public static IReadOnlyList<Diagnostic> Evaluate(SystemSnapshot s, string profile = "default")
+    private const double PcieWidthCheckMinLoadPct = 50;
+
+    public static IReadOnlyList<Diagnostic> Evaluate(SystemSnapshot s, HealthThresholds? thresholds = null)
     {
+        var t = thresholds ?? HealthThresholds.Default;
         var list = new List<Diagnostic>();
 
         if (s.Cpu?.TempC is double cpu)
-        {
-            if (cpu >= 90) list.Add(new(HealthLevel.Critical, "CPU_HOT", $"CPU {cpu:0.#}°C"));
-            else if (cpu >= 80) list.Add(new(HealthLevel.Warning, "CPU_WARM", $"CPU {cpu:0.#}°C"));
-        }
+            AddByLevel(list, t.CpuTempC.Classify(cpu), "CPU_HOT", "CPU_WARM", $"CPU {cpu:0.#}°C");
 
         foreach (var g in s.Gpus)
         {
             if (g.CoreTempC is double core)
-            {
-                if (core >= 85) list.Add(new(HealthLevel.Critical, "GPU_HOT", $"{g.Name}: GPU {core:0.#}°C"));
-                else if (core >= 80) list.Add(new(HealthLevel.Warning, "GPU_WARM", $"{g.Name}: GPU {core:0.#}°C"));
-            }
+                AddByLevel(list, t.GpuCoreTempC.Classify(core), "GPU_HOT", "GPU_WARM", $"{g.Name}: GPU {core:0.#}°C");
 
             if (g.HotspotTempC is double hs)
-            {
-                if (hs >= 105) list.Add(new(HealthLevel.Critical, "HOTSPOT_HOT", $"{g.Name}: hotspot {hs:0.#}°C"));
-                else if (hs >= 95) list.Add(new(HealthLevel.Warning, "HOTSPOT_WARM", $"{g.Name}: hotspot {hs:0.#}°C"));
-            }
+                AddByLevel(list, t.GpuHotspotTempC.Classify(hs), "HOTSPOT_HOT", "HOTSPOT_WARM", $"{g.Name}: hotspot {hs:0.#}°C");
 
             // Conservative generic thresholds. Vendor/model profiles can override later.
             if (g.MemoryTempC is double mem)
-            {
-                if (mem >= 105) list.Add(new(HealthLevel.Critical, "VRAM_HOT", $"{g.Name}: memory {mem:0.#}°C"));
-                else if (mem >= 95) list.Add(new(HealthLevel.Warning, "VRAM_WARM", $"{g.Name}: memory {mem:0.#}°C"));
-            }
+                AddByLevel(list, t.GpuMemoryTempC.Classify(mem), "VRAM_HOT", "VRAM_WARM", $"{g.Name}: memory {mem:0.#}°C");
 
             if (g.PcieWidthCurrent.HasValue && g.PcieWidthMax.HasValue &&
-                g.UtilizationPct.GetValueOrDefault() > 50 &&
+                g.UtilizationPct.GetValueOrDefault() > PcieWidthCheckMinLoadPct &&
                 g.PcieWidthCurrent.Value < g.PcieWidthMax.Value)
             {
                 list.Add(new(HealthLevel.Info, "PCIE_WIDTH",
@@ -46,10 +37,8 @@ public static class DiagnosticsEngine
             }
         }
 
-        if (s.Memory.LoadPct >= 95)
-            list.Add(new(HealthLevel.Critical, "RAM_PRESSURE", $"RAM {s.Memory.LoadPct:0}% used"));
-        else if (s.Memory.LoadPct >= 85)
-            list.Add(new(HealthLevel.Warning, "RAM_PRESSURE", $"RAM {s.Memory.LoadPct:0}% used"));
+        AddByLevel(list, t.RamLoadPct.Classify(s.Memory.LoadPct), "RAM_PRESSURE", "RAM_PRESSURE",
+            $"RAM {s.Memory.LoadPct:0}% used");
 
         if (s.Memory.Pressure == MemoryPressure.Critical)
             list.Add(new(HealthLevel.Critical, "MEMORY_PRESSURE", "OS memory pressure critical"));
@@ -65,5 +54,14 @@ public static class DiagnosticsEngine
             list.Add(new(HealthLevel.Good, "HEALTHY", "No important issues detected"));
 
         return list;
+    }
+
+    private static void AddByLevel(
+        List<Diagnostic> list, HealthLevel level, string criticalCode, string warningCode, string message)
+    {
+        if (level == HealthLevel.Critical)
+            list.Add(new(HealthLevel.Critical, criticalCode, message));
+        else if (level == HealthLevel.Warning)
+            list.Add(new(HealthLevel.Warning, warningCode, message));
     }
 }

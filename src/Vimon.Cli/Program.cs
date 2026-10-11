@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Spectre.Console;
+using Spectre.Console.Rendering;
 using Vimon.Cli;
 using Vimon.Core;
 #if WINDOWS
@@ -9,11 +11,13 @@ using Vimon.Platform.Linux;
 using Vimon.Platform.MacOS;
 #endif
 
-const int refreshIntervalMs = 500;
+const int sampleIntervalMs = 500;
+const int frameIntervalMs = 100;
 const int keyPollIntervalMs = 25;
 const int onceWarmupMs = 500;
 const int onceRetryMs = 250;
 const int onceMaxWaitMs = 2000;
+const int minWidth = 42;
 
 using IPlatformTelemetry? telemetry = TryCreateTelemetry();
 
@@ -35,21 +39,26 @@ if (args.Contains("--once"))
     telemetry.Read();
     Thread.Sleep(onceWarmupMs);
 
-    var snapshot = telemetry.Read();
+    var first = telemetry.Read();
     long deadline = Environment.TickCount64 + onceMaxWaitMs;
 
-    while (snapshot.Cpu is not null && snapshot.Cpu.LoadPct is null && Environment.TickCount64 < deadline)
+    while (first.Cpu is not null && first.Cpu.LoadPct is null && Environment.TickCount64 < deadline)
     {
         Thread.Sleep(onceRetryMs);
-        snapshot = telemetry.Read();
+        first = telemetry.Read();
     }
-    var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
-    var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
+
+    var onceGpu = GpuAt(first, 0);
+    var onceDiagnostics = DiagnosticsEngine.Evaluate(first);
 
     // Compact one-shot output is meant for status bars and scripts, so it is never cut to the window.
-    Console.Write(compact
-        ? CompactRenderer.Render(snapshot, gpu, diagnostics, 0, maxWidth: null)
-        : FrameRenderer.Render(snapshot, gpu, diagnostics, 0, GetSafeWidth(), "-", hideMissing));
+    if (compact)
+        Console.Write(CompactRenderer.Render(first, onceGpu, onceDiagnostics, 0, maxWidth: null));
+    else
+        AnsiConsole.Write(Dashboard.Build(
+            first, onceGpu, onceDiagnostics, 0, MetricHistory.Empty,
+            new DashboardOptions(AnsiConsole.Profile.Width, hideMissing)));
+
     return;
 }
 
@@ -58,114 +67,145 @@ bool running = true;
 bool paused = false;
 int frame = 0;
 int lastWidth = -1;
-int lastHeight = -1;
-int lastLineCount = 0;
 bool canReadKeys = !Console.IsInputRedirected;
-string[] spinner = ["|", "/", "-", "\\"];
+var history = MetricHistory.Empty;
+SystemSnapshot? snapshot = null;
+long nextSampleAt = 0;
+IReadOnlyList<string> spinner = AnsiConsole.Profile.Capabilities.Unicode
+    ? Spinner.Known.Dots.Frames
+    : ["|", "/", "-", "\\"];
 
-// Ctrl+C ends the loop normally so the finally block restores the cursor and disposes the sensors.
+// Ctrl+C ends the loop normally so the alternate screen, cursor and sensors are restored and disposed.
 Console.CancelKeyPress += (_, e) =>
 {
     e.Cancel = true;
     running = false;
 };
 
-bool useAlternateScreen = TerminalScreen.ShouldUseAlternateScreen(
-    OperatingSystem.IsWindows(), Console.IsOutputRedirected);
+// Like top/htop: own screen without scrollback, previous terminal content returns on exit.
+if (!Console.IsOutputRedirected && AnsiConsole.Profile.Capabilities.AlternateBuffer)
+    AnsiConsole.AlternateScreen(RunLiveView);
+else
+    RunLiveView();
 
-if (useAlternateScreen)
-    Console.Write(TerminalScreen.EnterAlternateScreen);
-
-Console.CursorVisible = false;
-
-try
+void RunLiveView()
 {
-    while (running)
+    AnsiConsole.Cursor.Hide();
+
+    try
     {
-        if (!paused)
-        {
-            var snapshot = telemetry.Read();
-
-            selectedGpu = snapshot.Gpus.Count == 0
-                ? 0
-                : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
-
-            var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[selectedGpu] : null;
-            var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
-
-            int width = GetSafeWidth();
-            int height = GetSafeHeight();
-
-            if (width != lastWidth || height != lastHeight)
+        AnsiConsole.Live(new Text(""))
+            .AutoClear(true)
+            .Overflow(VerticalOverflow.Ellipsis)
+            .Cropping(VerticalOverflowCropping.Bottom)
+            .Start(context =>
             {
-                TryClear();
-                lastWidth = width;
-                lastHeight = height;
-                lastLineCount = 0;
-            }
-            else
-            {
-                TryHome();
-            }
-
-            string text = compact
-                ? CompactRenderer.Render(snapshot, gpu, diagnostics, selectedGpu, width)
-                : FrameRenderer.Render(
-                    snapshot,
-                    gpu,
-                    diagnostics,
-                    selectedGpu,
-                    width,
-                    spinner[frame++ % spinner.Length],
-                    hideMissing);
-
-            var fitted = TerminalFrame.Fit(text, height, lastLineCount);
-            Console.Write(fitted.Text);
-            lastLineCount = fitted.LineCount;
-        }
-
-        var end = DateTime.UtcNow.AddMilliseconds(refreshIntervalMs);
-        while (DateTime.UtcNow < end && running)
-        {
-            if (canReadKeys && Console.KeyAvailable)
-            {
-                var key = Console.ReadKey(true).Key;
-
-                if (key is ConsoleKey.Q or ConsoleKey.Escape)
-                    running = false;
-                else if (key is ConsoleKey.P or ConsoleKey.Spacebar)
-                    paused = !paused;
-                else if (key == ConsoleKey.H)
+                while (running)
                 {
-                    hideMissing = !hideMissing;
-                    end = DateTime.UtcNow; // redraw right away instead of after the refresh interval
+                    SampleIfDue();
+                    context.UpdateTarget(BuildView());
+                    context.Refresh();
+                    WaitForKeys(frameIntervalMs);
+                    frame++;
                 }
-                else if (key == ConsoleKey.C)
-                {
-                    compact = !compact;
-                    lastWidth = -1; // the layouts differ in width, so start from a cleared screen
-                    end = DateTime.UtcNow;
-                }
-                else if (key == ConsoleKey.RightArrow)
-                    selectedGpu++;
-                else if (key == ConsoleKey.LeftArrow)
-                    selectedGpu = Math.Max(0, selectedGpu - 1);
-            }
-
-            Thread.Sleep(keyPollIntervalMs);
-        }
+            });
+    }
+    finally
+    {
+        AnsiConsole.Cursor.Show();
     }
 }
-finally
-{
-    Console.CursorVisible = true;
 
-    // Leaving the alternate screen restores the terminal content from before vimon started.
-    if (useAlternateScreen)
-        Console.Write(TerminalScreen.LeaveAlternateScreen);
-    else
-        TryClear();
+// Sensors are read every sampleIntervalMs; the view redraws faster so the spinner animates smoothly.
+void SampleIfDue()
+{
+    long now = Environment.TickCount64;
+
+    if (snapshot is not null && (paused || now < nextSampleAt))
+        return;
+
+    snapshot = telemetry.Read();
+    selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
+    history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
+    nextSampleAt = now + sampleIntervalMs;
 }
+
+IRenderable BuildView()
+{
+    var current = snapshot!;
+    var gpu = GpuAt(current, selectedGpu);
+    var diagnostics = DiagnosticsEngine.Evaluate(current);
+    int width = GetSafeWidth();
+
+    // A narrower window re-wraps the previous frame, so start from a clean screen after a resize.
+    if (width != lastWidth)
+    {
+        AnsiConsole.Clear();
+        lastWidth = width;
+    }
+
+    if (compact)
+        return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
+
+    var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused);
+    return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
+}
+
+void WaitForKeys(int budgetMs)
+{
+    long end = Environment.TickCount64 + budgetMs;
+
+    while (running && Environment.TickCount64 < end)
+    {
+        if (canReadKeys && Console.KeyAvailable && HandleKey(Console.ReadKey(intercept: true).Key))
+            return;
+
+        Thread.Sleep(keyPollIntervalMs);
+    }
+}
+
+// Returns true when the view should redraw right away.
+bool HandleKey(ConsoleKey key)
+{
+    switch (key)
+    {
+        case ConsoleKey.Q or ConsoleKey.Escape:
+            running = false;
+            return true;
+        case ConsoleKey.P or ConsoleKey.Spacebar:
+            paused = !paused;
+            return true;
+        case ConsoleKey.H:
+            hideMissing = !hideMissing;
+            return true;
+        case ConsoleKey.C:
+            compact = !compact;
+            return true;
+        case ConsoleKey.RightArrow:
+            SelectGpu(selectedGpu + 1);
+            return true;
+        case ConsoleKey.LeftArrow:
+            SelectGpu(selectedGpu - 1);
+            return true;
+        default:
+            return false;
+    }
+}
+
+void SelectGpu(int index)
+{
+    int gpuCount = snapshot?.Gpus.Count ?? 0;
+    int clamped = gpuCount == 0 ? 0 : Math.Clamp(index, 0, gpuCount - 1);
+
+    if (clamped == selectedGpu)
+        return;
+
+    selectedGpu = clamped;
+    history = history.WithoutGpu();
+}
+
+static GpuMetrics? GpuAt(SystemSnapshot s, int index) =>
+    s.Gpus.Count > 0 ? s.Gpus[Math.Clamp(index, 0, s.Gpus.Count - 1)] : null;
 
 static IPlatformTelemetry? TryCreateTelemetry()
 {
@@ -198,33 +238,6 @@ static IPlatformTelemetry CreateTelemetry()
 
 static int GetSafeWidth()
 {
-    try { return Math.Max(FrameRenderer.MinWidth, Console.WindowWidth - 1); }
+    try { return Math.Max(minWidth, Console.WindowWidth - 1); }
     catch { return 80; }
-}
-
-// Visible rows, or 0 when the terminal does not report its size (TerminalFrame then skips truncation).
-static int GetSafeHeight()
-{
-    try { return Math.Max(0, Console.WindowHeight); }
-    catch { return 0; }
-}
-
-static void TryHome()
-{
-    try
-    {
-        if (!Console.IsOutputRedirected)
-            Console.SetCursorPosition(0, 0);
-    }
-    catch { }
-}
-
-static void TryClear()
-{
-    try
-    {
-        if (!Console.IsOutputRedirected)
-            Console.Clear();
-    }
-    catch { }
 }

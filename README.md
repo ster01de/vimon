@@ -8,9 +8,9 @@ A focused terminal monitor for the hardware metrics that actually matter.
 
 `CPU · GPU · VRAM · RAM · PCIe · Thermals`
 
-![Vimon demo](docs/assets/vimon-hero.gif)
+![Vimon live view on an Apple M2](docs/assets/vimon-demo.gif)
 
-<sub>Demo recorded on Windows with the v0.1 layout.</sub>
+<sub>Real terminal recording on an Apple M2, made with <a href="https://github.com/charmbracelet/vhs">VHS</a> from <a href="docs/demo.tape"><code>docs/demo.tape</code></a>. Nothing staged: the values are what the machine reported.</sub>
 
 [![release](https://img.shields.io/github/v/release/ster01de/vimon?include_prereleases&sort=semver&label=release)](https://github.com/ster01de/vimon/releases)
 [![build](https://github.com/ster01de/vimon/actions/workflows/build.yml/badge.svg)](https://github.com/ster01de/vimon/actions/workflows/build.yml)
@@ -39,35 +39,9 @@ Vimon does the opposite: it surfaces the handful of metrics that help you decide
 
 No 300-row sensor table. No hunting through labels.
 
-```text
-+--------------------------------------------------+
-| VIMON  - LIVE  (empty rows hidden)               |
-| Q quit  P pause  H hide —  <- / -> GPU           |
-+--------------------------------------------------+
-| STATUS                                           |
-| Warning: OS memory pressure elevated             |
-+--------------------------------------------------+
-| CPU                                              |
-| Apple M2                                         |
-| Temp        47.1 C                               |
-| Load        41.5 %                               |
-| Thermal     Nominal                              |
-+--------------------------------------------------+
-| GPU 1/1                                          |
-| Apple M2                                         |
-| Core        37.4 C                               |
-| Hotspot     40 C                                 |
-| Load        18 %                                 |
-| Memory      0.4 GB                               |
-+--------------------------------------------------+
-| MEMORY                                           |
-| RAM         6.5 / 8.0 GB                         |
-| Usage       81 %                                 |
-| Pressure    Warning                              |
-+--------------------------------------------------+
-```
+![Vimon dashboard: STATUS on top, CPU and GPU side by side with sparklines, memory bar below](docs/assets/vimon.png)
 
-<sub>macOS · Apple M2 · <code>vimon --once --hide-missing</code></sub>
+<sub>Still frame from the same recording.</sub>
 
 ---
 
@@ -174,7 +148,7 @@ Options:
 --hide-missing   start with rows without a value hidden
 ```
 
-On macOS the live view uses the terminal's alternate screen, like `top`: your previous terminal content comes back when you quit. If the window is too short, the frame is cut from the bottom with a hint; STATUS always stays visible.
+The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. If the window is too short, the view is cut from the bottom; STATUS always stays visible.
 
 ### Compact view
 
@@ -199,19 +173,7 @@ Vimon is not trying to replace HWiNFO, lm-sensors, iStat Menus or vendor tools.
 
 Those tools expose data.
 
-Vimon tries to expose **meaning**.
-
-```text
-VRAM      86°C   OK
-HOTSPOT   85°C   OK
-GPU       75°C   OK
-PCIE      GEN3 x8 / max GEN4 x16
-
-Assessment:
-Thermals are healthy.
-PCIe width is below the adapter maximum.
-Impact is workload-dependent.
-```
+Vimon tries to expose **meaning**: the STATUS panel on top says in one line per finding what deserves attention, and its border turns green, yellow or red with the worst one. Temperatures and bars use the same thresholds, so colour always means the same thing.
 
 ---
 
