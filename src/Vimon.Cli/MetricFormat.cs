@@ -16,6 +16,12 @@ internal static class MetricFormat
     public static string? ShortPercent(double? value) =>
         IsPresent(value) ? $"{value:0}%" : null;
 
+    /// <summary>Filled cells of a bar with <paramref name="cells"/> cells; 0 for a missing or non-finite value.</summary>
+    public static int FilledCells(double percent, int cells) =>
+        double.IsFinite(percent)
+            ? (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * cells, MidpointRounding.AwayFromZero)
+            : 0;
+
     /// <summary>Cuts <paramref name="text"/> to <paramref name="width"/>, ending in an ellipsis when cut.</summary>
     public static string Truncate(string text, int width)
     {

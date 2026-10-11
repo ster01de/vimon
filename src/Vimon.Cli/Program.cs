@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using Spectre.Console;
@@ -152,7 +153,7 @@ IRenderable BuildView()
 
     if (mode == ViewMode.Widget)
         return WidgetRenderer.Build(current, gpu, diagnostics, history,
-            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat)));
+            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture)));
 
     if (mode == ViewMode.Compact)
         return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
@@ -177,11 +178,18 @@ void WaitForKeys(int budgetMs)
 // Returns true when the view should redraw right away.
 bool HandleKey(ConsoleKey key)
 {
+    if (key is ConsoleKey.Q or ConsoleKey.Escape)
+    {
+        running = false;
+        return true;
+    }
+
+    // The widget has no visible state for pause or GPU selection, so a stray key must not freeze or change it.
+    if (mode == ViewMode.Widget)
+        return false;
+
     switch (key)
     {
-        case ConsoleKey.Q or ConsoleKey.Escape:
-            running = false;
-            return true;
         case ConsoleKey.P or ConsoleKey.Spacebar:
             paused = !paused;
             return true;

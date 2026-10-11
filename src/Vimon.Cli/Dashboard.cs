@@ -246,7 +246,7 @@ internal static class Dashboard
 
     private static string Bar(double percent, string color)
     {
-        int filled = (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * BarWidth, MidpointRounding.AwayFromZero);
+        int filled = MetricFormat.FilledCells(percent, BarWidth);
         return $"[{color}]{new string('█', filled)}[/][grey]{new string('░', BarWidth - filled)}[/]";
     }
 }

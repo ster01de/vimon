@@ -129,7 +129,7 @@ internal static class WidgetRenderer
 
     private static string Bar(double percent, string color)
     {
-        int filled = (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * SparkLength, MidpointRounding.AwayFromZero);
+        int filled = MetricFormat.FilledCells(percent, SparkLength);
         return $"[{color}]{new string('█', filled)}[/][grey]{new string('░', SparkLength - filled)}[/]";
     }
 

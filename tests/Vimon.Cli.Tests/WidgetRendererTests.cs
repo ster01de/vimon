@@ -208,6 +208,16 @@ public class WidgetRendererTests
     }
 
     [Fact]
+    public void SurvivesANonFiniteRamPercentage()
+    {
+        var broken = Snapshot() with { Memory = Memory with { LoadPct = double.NaN } };
+
+        var lines = Lines(Render(broken));
+
+        Assert.Contains(lines, line => line.StartsWith("RAM"));
+    }
+
+    [Fact]
     public void ShowsTheTimestampOnlyWhenGiven()
     {
         Assert.DoesNotContain(":", Lines(Render(Snapshot()))[0]);

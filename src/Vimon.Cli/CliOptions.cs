@@ -27,7 +27,7 @@ internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing)
         return new CliOptions(args.Contains(OnceFlag), mode, args.Contains(HideMissingFlag));
     }
 
-    /// <summary>The C key switches full and compact; the widget stays a widget so a stray key cannot break it.</summary>
+    /// <summary>The C key switches full and compact; the widget stays a widget.</summary>
     public static ViewMode ToggleCompact(ViewMode mode) => mode switch
     {
         ViewMode.Full => ViewMode.Compact,

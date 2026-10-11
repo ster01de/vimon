@@ -179,7 +179,7 @@ Pressure  Normal
 Thermal   Nominal
 ```
 
-`--widget` wins over `--compact`, and `C` does not leave it. On macOS, [kitty](https://sw.kovidgoyal.net/kitty/)'s panel turns it into a desktop widget: see [Desktop widget with kitty](docs/platforms/macos.md#desktop-widget-with-kitty).
+`--widget` wins over `--compact`; in the widget only `Q` and `Esc` react, so a stray key cannot pause or change it. On macOS, [kitty](https://sw.kovidgoyal.net/kitty/)'s panel turns it into a desktop widget: see [Desktop widget with kitty](docs/platforms/macos.md#desktop-widget-with-kitty).
 
 ---
 
