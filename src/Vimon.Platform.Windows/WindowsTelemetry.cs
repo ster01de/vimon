@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using LibreHardwareMonitor.Hardware;
 using Vimon.Core;
@@ -14,6 +14,8 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
         IsMemoryEnabled = true,
         IsStorageEnabled = true
     };
+
+    private readonly NvidiaPcieProbe _nvidiaPcie = new();
 
     public string PlatformName => "Windows";
 
@@ -40,13 +42,13 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
                 "CPU Core #1", "Core #1")
         );
 
-        var nvidiaPcie = QueryNvidiaPcie();
-        int nvidiaIndex = 0;
-
         var gpuHws = all.Where(h =>
             h.HardwareType is HardwareType.GpuNvidia
             or HardwareType.GpuAmd
             or HardwareType.GpuIntel).ToList();
+
+        var nvidiaPcie = ReadNvidiaPcie(gpuHws);
+        int nvidiaIndex = 0;
 
         var gpus = new List<GpuMetrics>();
 
@@ -62,15 +64,9 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
                 _ => Vendor.Unknown
             };
 
-            (int? genCur, int? widthCur, int? genMax, int? widthMax) pcie = default;
-
-            if (vendor == Vendor.Nvidia)
-            {
-                if (nvidiaIndex < nvidiaPcie.Count)
-                    pcie = nvidiaPcie[nvidiaIndex];
-
-                nvidiaIndex++;
-            }
+            var pcie = vendor == Vendor.Nvidia
+                ? nvidiaPcie[nvidiaIndex++]
+                : PcieLink.Unknown;
 
             gpus.Add(new GpuMetrics(
                 i,
@@ -102,10 +98,10 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
                     "GPU Memory Total", "Memory Total") is double totalMb
                         ? totalMb / 1024.0
                         : null,
-                pcie.genCur,
-                pcie.widthCur,
-                pcie.genMax,
-                pcie.widthMax
+                pcie.GenerationCurrent,
+                pcie.WidthCurrent,
+                pcie.GenerationMax,
+                pcie.WidthMax
             ));
         }
 
@@ -193,49 +189,17 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
         }
     }
 
-    private static List<(int? genCur, int? widthCur, int? genMax, int? widthMax)> QueryNvidiaPcie()
+    private IReadOnlyList<PcieLink> ReadNvidiaPcie(IEnumerable<IHardware> gpuHws)
     {
-        var rows = new List<(int?, int?, int?, int?)>();
+        var nvidiaNames = gpuHws
+            .Where(h => h.HardwareType == HardwareType.GpuNvidia)
+            .Select(h => h.Name)
+            .ToList();
 
-        try
-        {
-            var psi = new ProcessStartInfo
-            {
-                FileName = "nvidia-smi",
-                Arguments = "--query-gpu=pcie.link.gen.current,pcie.link.width.current,pcie.link.gen.max,pcie.link.width.max --format=csv,noheader,nounits",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(psi);
-
-            if (process is null)
-                return rows;
-
-            string output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit(1200);
-
-            foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var values = line.Split(',').Select(value => value.Trim()).ToArray();
-
-                rows.Add(values.Length >= 4
-                    ? (Parse(values[0]), Parse(values[1]), Parse(values[2]), Parse(values[3]))
-                    : default);
-            }
-        }
-        catch
-        {
-            // NVIDIA tooling is optional.
-        }
-
-        return rows;
+        return nvidiaNames.Count == 0
+            ? []
+            : NvidiaSmi.MatchByName(nvidiaNames, _nvidiaPcie.Read());
     }
-
-    private static int? Parse(string value) =>
-        int.TryParse(value, out int number) ? number : null;
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private sealed class MEMORYSTATUSEX
@@ -257,7 +221,9 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
     private static MemoryMetrics GetMemoryInfo()
     {
         var memory = new MEMORYSTATUSEX();
-        GlobalMemoryStatusEx(memory);
+
+        if (!GlobalMemoryStatusEx(memory))
+            throw new Win32Exception(Marshal.GetLastPInvokeError(), "GlobalMemoryStatusEx failed");
 
         const double gb = 1024d * 1024d * 1024d;
 
