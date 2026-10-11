@@ -24,6 +24,7 @@ if (telemetry is null)
 Console.OutputEncoding = Encoding.UTF8;
 
 bool hideMissing = args.Contains("--hide-missing");
+bool compact = args.Contains("--compact");
 
 if (args.Contains("--once"))
 {
@@ -33,9 +34,12 @@ if (args.Contains("--once"))
 
     var snapshot = telemetry.Read();
     var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
+    var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
 
-    Console.Write(FrameRenderer.Render(
-        snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-", hideMissing));
+    // Compact one-shot output is meant for status bars and scripts, so it is never cut to the window.
+    Console.Write(compact
+        ? CompactRenderer.Render(snapshot, gpu, diagnostics, 0, maxWidth: null)
+        : FrameRenderer.Render(snapshot, gpu, diagnostics, 0, GetSafeWidth(), "-", hideMissing));
     return;
 }
 
@@ -94,14 +98,16 @@ try
                 TryHome();
             }
 
-            string text = FrameRenderer.Render(
-                snapshot,
-                gpu,
-                diagnostics,
-                selectedGpu,
-                width,
-                spinner[frame++ % spinner.Length],
-                hideMissing);
+            string text = compact
+                ? CompactRenderer.Render(snapshot, gpu, diagnostics, selectedGpu, width)
+                : FrameRenderer.Render(
+                    snapshot,
+                    gpu,
+                    diagnostics,
+                    selectedGpu,
+                    width,
+                    spinner[frame++ % spinner.Length],
+                    hideMissing);
 
             var fitted = TerminalFrame.Fit(text, height, lastLineCount);
             Console.Write(fitted.Text);
@@ -123,6 +129,12 @@ try
                 {
                     hideMissing = !hideMissing;
                     end = DateTime.UtcNow; // redraw right away instead of after the refresh interval
+                }
+                else if (key == ConsoleKey.C)
+                {
+                    compact = !compact;
+                    lastWidth = -1; // the layouts differ in width, so start from a cleared screen
+                    end = DateTime.UtcNow;
                 }
                 else if (key == ConsoleKey.RightArrow)
                     selectedGpu++;

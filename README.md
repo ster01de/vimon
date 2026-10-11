@@ -161,6 +161,7 @@ Thresholds are conservative and the same for every machine for now. Fanless Appl
 P        pause
 Space    pause
 H        hide / show rows without a value (—)
+C        switch between full and compact view
 Q / Esc  quit
 Ctrl+C   quit
 ```
@@ -169,10 +170,26 @@ Options:
 
 ```text
 --once           print one frame and exit
+--compact        one- or two-line view (see below)
 --hide-missing   start with rows without a value hidden
 ```
 
 On macOS the live view uses the terminal's alternate screen, like `top`: your previous terminal content comes back when you quit. If the window is too short, the frame is cut from the bottom with a hint; STATUS always stays visible.
+
+### Compact view
+
+For small terminal panes, tmux and status bars. The first word is the overall status, missing values are left out, and a second line appears only when something needs attention:
+
+```text
+WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81%
+  OS memory pressure elevated
+```
+
+`vimon --once --compact` prints it once without cutting it to the window, so it can feed a status bar. For example in tmux:
+
+```bash
+set -g status-right '#(vimon --once --compact | head -1)'
+```
 
 ---
 
@@ -250,7 +267,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
 - [ ] Network and disk throughput
-- [ ] `--compact` one-line view for small terminals and status bars
+- [x] `--compact` one-line view for small terminals and status bars
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
 - [ ] AI section: local inference servers, loaded model, tokens per second
