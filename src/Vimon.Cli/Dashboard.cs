@@ -20,8 +20,10 @@ internal static class Dashboard
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
     private const int MaxStorageRows = 3;
-    private const double SparkTempMinC = 20;
-    private const double SparkTempMaxC = 100;
+    // Sparklines scale to the recent values, but span at least this much so noise stays flat.
+    private const double SparkTempMinSpanC = 10;
+    private const double SparkTempMaxC = 130;
+    private const double SparkLoadMinSpanPct = 20;
     private const double SparkLoadMaxPct = 100;
 
     public static IRenderable Build(
@@ -203,7 +205,7 @@ internal static class Dashboard
             return null;
 
         string text = $"{value:0.#} °C";
-        return $"[{ColorName(threshold.Classify(value!.Value))}]{text,-ValueWidth}[/]{Spark(history, SparkTempMinC, SparkTempMaxC)}";
+        return $"[{ColorName(threshold.Classify(value!.Value))}]{text,-ValueWidth}[/]{Spark(history, SparkTempMinSpanC, SparkTempMaxC)}";
     }
 
     private static string? Percent(double? value, IReadOnlyList<double> history)
@@ -212,7 +214,7 @@ internal static class Dashboard
             return null;
 
         string text = $"{value:0.#} %";
-        return $"{text,-ValueWidth}{Spark(history, 0, SparkLoadMaxPct)}";
+        return $"{text,-ValueWidth}{Spark(history, SparkLoadMinSpanPct, SparkLoadMaxPct)}";
     }
 
     private static string? Celsius(double? value) =>
@@ -244,8 +246,14 @@ internal static class Dashboard
             : current;
     }
 
-    private static string Spark(IReadOnlyList<double> history, double min, double max) =>
-        history.Count == 0 ? "" : $" [steelblue]{Sparkline.Render(history, min, max)}[/]";
+    private static string Spark(IReadOnlyList<double> history, double minSpan, double upperBound)
+    {
+        if (history.Count == 0)
+            return "";
+
+        var (min, max) = Sparkline.Scale(history, minSpan, lowerBound: 0, upperBound);
+        return $" [steelblue]{Sparkline.Render(history, min, max)}[/]";
+    }
 
     private static string Bar(double percent, string color)
     {

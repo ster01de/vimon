@@ -96,7 +96,8 @@ public class DashboardTests
 
         string output = Render(Snapshot(), history: history);
 
-        Assert.Contains("▃▅▆", LineWith(output, "Temp"));
+        // The scale fits the recent values (40..80 °C), so the curve uses the full block range.
+        Assert.Contains("▁▅█", LineWith(output, "Temp"));
     }
 
     [Fact]
