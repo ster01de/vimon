@@ -145,6 +145,7 @@ Options:
 ```text
 --once           print one frame and exit
 --compact        one- or two-line view (see below)
+--widget         borderless list for transparent desktop panels (see below)
 --hide-missing   start with rows without a value hidden
 ```
 
@@ -164,6 +165,21 @@ WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81%
 ```bash
 set -g status-right '#(vimon --once --compact | head -1)'
 ```
+
+### Widget view
+
+`vimon --widget` drops header, key help and borders and uses no background colours, so it can sit on the desktop in a transparent terminal panel. At most 30 columns wide; sparklines disappear below 27:
+
+```text
+OK                   16:06:15
+CPU   42°C  23%  ▄▅▅▅▅▄▃▄▅▆
+GPU   38°C   7%  ▄▆▅▇▂▅▃▂▃▄
+RAM         80%  ████████░░
+Pressure  Normal
+Thermal   Nominal
+```
+
+`--widget` wins over `--compact`, and `C` does not leave it. On macOS, [kitty](https://sw.kovidgoyal.net/kitty/)'s panel turns it into a desktop widget: see [Desktop widget with kitty](docs/platforms/macos.md#desktop-widget-with-kitty).
 
 ---
 
