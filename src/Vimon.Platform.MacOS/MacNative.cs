@@ -1,0 +1,171 @@
+using System.Runtime.InteropServices;
+
+namespace Vimon.Platform.MacOS;
+
+/// <summary>P/Invoke declarations for the public macOS system APIs used by the backend.</summary>
+internal static class MacNative
+{
+    private const string LibSystem = "/usr/lib/libSystem.B.dylib";
+    private const string IOKit = "/System/Library/Frameworks/IOKit.framework/IOKit";
+    private const string CoreFoundation = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
+    private const string LibObjC = "/usr/lib/libobjc.A.dylib";
+
+    public const string Foundation = "/System/Library/Frameworks/Foundation.framework/Foundation";
+
+    public const int KernSuccess = 0;
+    public const int HostCpuLoadInfo = 3;
+    public const uint HostCpuLoadInfoCount = 4;
+    public const int HostVmInfo64 = 4;
+    public const uint HostVmInfo64Count = 38;
+
+    public const uint CFStringEncodingUtf8 = 0x08000100;
+    public const int CFNumberDoubleType = 13;
+
+    // libSystem: sysctl and Mach host statistics
+
+    [DllImport(LibSystem)]
+    public static extern int sysctlbyname(string name, IntPtr oldp, ref nuint oldlenp, IntPtr newp, nuint newlen);
+
+    [DllImport(LibSystem)]
+    public static extern uint mach_host_self();
+
+    [DllImport(LibSystem)]
+    public static extern int host_page_size(uint host, out nuint pageSize);
+
+    [DllImport(LibSystem)]
+    public static extern int host_statistics(uint host, int flavor, out CpuLoadInfo info, ref uint count);
+
+    [DllImport(LibSystem)]
+    public static extern int host_statistics64(uint host, int flavor, out VmStatistics64 info, ref uint count);
+
+    // IOKit registry
+
+    [DllImport(IOKit)]
+    public static extern IntPtr IOServiceMatching(string name);
+
+    /// <remarks>Consumes one reference to <paramref name="matching"/>.</remarks>
+    [DllImport(IOKit)]
+    public static extern int IOServiceGetMatchingServices(uint mainPort, IntPtr matching, out uint iterator);
+
+    [DllImport(IOKit)]
+    public static extern uint IOIteratorNext(uint iterator);
+
+    [DllImport(IOKit)]
+    public static extern int IOObjectRelease(uint obj);
+
+    [DllImport(IOKit)]
+    public static extern int IORegistryEntryGetParentEntry(uint entry, string plane, out uint parent);
+
+    [DllImport(IOKit)]
+    public static extern IntPtr IORegistryEntryCreateCFProperty(uint entry, IntPtr key, IntPtr allocator, uint options);
+
+    // CoreFoundation
+
+    [DllImport(CoreFoundation)]
+    public static extern IntPtr CFStringCreateWithCString(IntPtr allocator, string value, uint encoding);
+
+    [DllImport(CoreFoundation)]
+    public static extern void CFRelease(IntPtr cf);
+
+    [DllImport(CoreFoundation)]
+    public static extern nuint CFGetTypeID(IntPtr cf);
+
+    [DllImport(CoreFoundation)]
+    public static extern nuint CFStringGetTypeID();
+
+    [DllImport(CoreFoundation)]
+    public static extern nuint CFNumberGetTypeID();
+
+    [DllImport(CoreFoundation)]
+    public static extern nuint CFDataGetTypeID();
+
+    [DllImport(CoreFoundation)]
+    public static extern nuint CFDictionaryGetTypeID();
+
+    [DllImport(CoreFoundation)]
+    public static extern IntPtr CFDictionaryGetValue(IntPtr dictionary, IntPtr key);
+
+    [DllImport(CoreFoundation)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static extern bool CFNumberGetValue(IntPtr number, int type, out double value);
+
+    [DllImport(CoreFoundation)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static extern bool CFStringGetCString(IntPtr value, byte[] buffer, nint bufferSize, uint encoding);
+
+    [DllImport(CoreFoundation)]
+    public static extern nint CFDataGetLength(IntPtr data);
+
+    [DllImport(CoreFoundation)]
+    public static extern IntPtr CFDataGetBytePtr(IntPtr data);
+
+    // Objective-C runtime
+
+    [DllImport(LibObjC)]
+    public static extern IntPtr objc_getClass(string name);
+
+    [DllImport(LibObjC)]
+    public static extern IntPtr sel_registerName(string name);
+
+    [DllImport(LibObjC)]
+    public static extern IntPtr objc_msgSend(IntPtr receiver, IntPtr selector);
+}
+
+/// <summary>host_cpu_load_info: cumulative ticks per CPU state, in CPU_STATE_* order.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct CpuLoadInfo
+{
+    public uint User;
+    public uint System;
+    public uint Idle;
+    public uint Nice;
+
+    public CpuLoadInfo(uint user, uint system, uint idle, uint nice)
+    {
+        User = user;
+        System = system;
+        Idle = idle;
+        Nice = nice;
+    }
+}
+
+/// <summary>vm_statistics64 from &lt;mach/vm_statistics.h&gt;. Field order and sizes must match exactly.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct VmStatistics64
+{
+    public uint FreeCount;
+    public uint ActiveCount;
+    public uint InactiveCount;
+    public uint WireCount;
+    public ulong ZeroFillCount;
+    public ulong Reactivations;
+    public ulong Pageins;
+    public ulong Pageouts;
+    public ulong Faults;
+    public ulong CowFaults;
+    public ulong Lookups;
+    public ulong Hits;
+    public ulong Purges;
+    public uint PurgeableCount;
+    public uint SpeculativeCount;
+    public ulong Decompressions;
+    public ulong Compressions;
+    public ulong Swapins;
+    public ulong Swapouts;
+    public uint CompressorPageCount;
+    public uint ThrottledCount;
+    public uint ExternalPageCount;
+    public uint InternalPageCount;
+    public ulong TotalUncompressedPagesInCompressor;
+}
+
+/// <summary>xsw_usage from &lt;sys/sysctl.h&gt; (vm.swapusage).</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct SwapUsage
+{
+    public ulong Total;
+    public ulong Available;
+    public ulong Used;
+    public uint PageSize;
+    public int Encrypted;
+}

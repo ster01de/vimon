@@ -30,10 +30,21 @@ jobs:
           dotnet-version: '8.0.x'
       - run: dotnet build src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0
       - run: dotnet test tests/Vimon.Core.Tests/Vimon.Core.Tests.csproj -c Release
-      - name: Smoke test CLI startup
+      - run: dotnet test tests/Vimon.Platform.MacOS.Tests/Vimon.Platform.MacOS.Tests.csproj -c Release
+      - name: Smoke test one-shot output
         run: |
-          set +e
-          output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build 2>&1)
-          code=$?
+          output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build -- --once)
           echo "$output"
-          test "$code" -eq 1 && grep -q "macOS backend is not implemented yet" <<< "$output"
+          grep -q "Thermal" <<< "$output"
+          grep -q "Pressure" <<< "$output"
+      - name: Publish macOS arm64 preview
+        run: |
+          dotnet publish src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 -r osx-arm64 \
+            --self-contained true -p:PublishSingleFile=true -o dist/osx-arm64
+          # Artifacts drop the executable bit, so ship a tarball that keeps it.
+          tar -czf vimon-macos-arm64.tar.gz -C dist/osx-arm64 vimon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vimon-macos-arm64
+          path: vimon-macos-arm64.tar.gz
+          retention-days: 14

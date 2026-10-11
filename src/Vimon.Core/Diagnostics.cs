@@ -51,6 +51,16 @@ public static class DiagnosticsEngine
         else if (s.Memory.LoadPct >= 85)
             list.Add(new(HealthLevel.Warning, "RAM_PRESSURE", $"RAM {s.Memory.LoadPct:0}% used"));
 
+        if (s.Memory.Pressure == MemoryPressure.Critical)
+            list.Add(new(HealthLevel.Critical, "MEMORY_PRESSURE", "OS memory pressure critical"));
+        else if (s.Memory.Pressure == MemoryPressure.Warning)
+            list.Add(new(HealthLevel.Warning, "MEMORY_PRESSURE", "OS memory pressure elevated"));
+
+        if (s.Thermal == ThermalState.Critical)
+            list.Add(new(HealthLevel.Critical, "THERMAL_CRITICAL", "System thermal state critical"));
+        else if (s.Thermal == ThermalState.Serious)
+            list.Add(new(HealthLevel.Warning, "THERMAL_SERIOUS", "System thermal state serious, throttling likely"));
+
         if (list.Count == 0)
             list.Add(new(HealthLevel.Good, "HEALTHY", "No important issues detected"));
 
