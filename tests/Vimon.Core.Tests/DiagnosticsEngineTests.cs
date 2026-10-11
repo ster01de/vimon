@@ -91,6 +91,33 @@ public class DiagnosticsEngineTests
             Snapshot(gpus: [Gpu(utilizationPct: utilizationPct, pcieWidthCurrent: widthCurrent, pcieWidthMax: widthMax)]),
             expectedCode);
 
+    [Theory]
+    [InlineData(ThermalState.Nominal, "HEALTHY", HealthLevel.Good)]
+    [InlineData(ThermalState.Fair, "HEALTHY", HealthLevel.Good)]
+    [InlineData(ThermalState.Serious, "THERMAL_SERIOUS", HealthLevel.Warning)]
+    [InlineData(ThermalState.Critical, "THERMAL_CRITICAL", HealthLevel.Critical)]
+    public void ClassifiesOsThermalState(ThermalState state, string expectedCode, HealthLevel expectedLevel)
+    {
+        var diagnostic = Assert.Single(DiagnosticsEngine.Evaluate(Snapshot() with { Thermal = state }));
+
+        Assert.Equal(expectedCode, diagnostic.Code);
+        Assert.Equal(expectedLevel, diagnostic.Level);
+    }
+
+    [Theory]
+    [InlineData(MemoryPressure.Normal, "HEALTHY", HealthLevel.Good)]
+    [InlineData(MemoryPressure.Warning, "MEMORY_PRESSURE", HealthLevel.Warning)]
+    [InlineData(MemoryPressure.Critical, "MEMORY_PRESSURE", HealthLevel.Critical)]
+    public void ClassifiesOsMemoryPressure(MemoryPressure pressure, string expectedCode, HealthLevel expectedLevel)
+    {
+        var snapshot = Snapshot(memory: IdleMemory with { Pressure = pressure });
+
+        var diagnostic = Assert.Single(DiagnosticsEngine.Evaluate(snapshot));
+
+        Assert.Equal(expectedCode, diagnostic.Code);
+        Assert.Equal(expectedLevel, diagnostic.Level);
+    }
+
     [Fact]
     public void ReportsIssuesFromEveryGpu()
     {

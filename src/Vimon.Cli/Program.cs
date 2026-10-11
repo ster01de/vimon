@@ -17,6 +17,22 @@ if (telemetry is null)
 }
 
 Console.OutputEncoding = Encoding.UTF8;
+
+if (args.Contains("--once"))
+{
+    // Some values (e.g. CPU load) are deltas between two samples, so take a warm-up sample first.
+    const int onceWarmupMs = 500;
+
+    telemetry.Read();
+    Thread.Sleep(onceWarmupMs);
+
+    var snapshot = telemetry.Read();
+    var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
+
+    Console.Write(Render(snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-"));
+    return;
+}
+
 Console.CursorVisible = false;
 
 int selectedGpu = 0;
@@ -160,6 +176,10 @@ static string Render(
     Row($"Temp        {FmtMetric(s.Cpu?.TempC, " C", positiveOnly: true)}");
     Row($"Load        {FmtMetric(s.Cpu?.LoadPct, " %")}");
     Row($"Power       {FmtMetric(s.Cpu?.PackagePowerW, " W", positiveOnly: true)}");
+
+    if (s.Thermal is ThermalState thermal)
+        Row($"Thermal     {thermal}");
+
     Border();
 
     Row($"GPU {(s.Gpus.Count == 0 ? "0/0" : $"{selectedGpu + 1}/{s.Gpus.Count}")}");
@@ -185,6 +205,9 @@ static string Render(
     Row("MEMORY");
     Row($"RAM         {s.Memory.UsedGb:0.0} / {s.Memory.TotalGb:0.0} GB");
     Row($"Usage       {s.Memory.LoadPct:0} %");
+
+    if (s.Memory.Pressure is MemoryPressure pressure)
+        Row($"Pressure    {pressure}");
     Border();
 
     Row("STORAGE");
