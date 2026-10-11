@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using Vimon.Cli;
 using Vimon.Core;
 #if WINDOWS
 using Vimon.Platform.Windows;
@@ -7,6 +8,10 @@ using Vimon.Platform.Windows;
 using Vimon.Platform.Linux;
 using Vimon.Platform.MacOS;
 #endif
+
+const int refreshIntervalMs = 500;
+const int keyPollIntervalMs = 25;
+const int onceWarmupMs = 500;
 
 using IPlatformTelemetry? telemetry = TryCreateTelemetry();
 
@@ -21,19 +26,15 @@ Console.OutputEncoding = Encoding.UTF8;
 if (args.Contains("--once"))
 {
     // Some values (e.g. CPU load) are deltas between two samples, so take a warm-up sample first.
-    const int onceWarmupMs = 500;
-
     telemetry.Read();
     Thread.Sleep(onceWarmupMs);
 
     var snapshot = telemetry.Read();
     var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
 
-    Console.Write(Render(snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-"));
+    Console.Write(FrameRenderer.Render(snapshot, gpu, DiagnosticsEngine.Evaluate(snapshot), 0, GetSafeWidth(), "-"));
     return;
 }
-
-Console.CursorVisible = false;
 
 int selectedGpu = 0;
 bool running = true;
@@ -41,7 +42,18 @@ bool paused = false;
 int frame = 0;
 int lastWidth = -1;
 int lastHeight = -1;
+int lastLineCount = 0;
+bool canReadKeys = !Console.IsInputRedirected;
 string[] spinner = ["|", "/", "-", "\\"];
+
+// Ctrl+C ends the loop normally so the finally block restores the cursor and disposes the sensors.
+Console.CancelKeyPress += (_, e) =>
+{
+    e.Cancel = true;
+    running = false;
+};
+
+Console.CursorVisible = false;
 
 try
 {
@@ -51,10 +63,9 @@ try
         {
             var snapshot = telemetry.Read();
 
-            if (snapshot.Gpus.Count == 0)
-                selectedGpu = 0;
-            else
-                selectedGpu = Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
+            selectedGpu = snapshot.Gpus.Count == 0
+                ? 0
+                : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
 
             var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[selectedGpu] : null;
             var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
@@ -67,25 +78,30 @@ try
                 TryClear();
                 lastWidth = width;
                 lastHeight = height;
+                lastLineCount = 0;
             }
             else
             {
                 TryHome();
             }
 
-            Console.Write(Render(
+            string text = FrameRenderer.Render(
                 snapshot,
                 gpu,
                 diagnostics,
                 selectedGpu,
                 width,
-                spinner[frame++ % spinner.Length]));
+                spinner[frame++ % spinner.Length]);
+
+            var fitted = TerminalFrame.Fit(text, height, lastLineCount);
+            Console.Write(fitted.Text);
+            lastLineCount = fitted.LineCount;
         }
 
-        var end = DateTime.UtcNow.AddMilliseconds(500);
+        var end = DateTime.UtcNow.AddMilliseconds(refreshIntervalMs);
         while (DateTime.UtcNow < end && running)
         {
-            if (Console.KeyAvailable)
+            if (canReadKeys && Console.KeyAvailable)
             {
                 var key = Console.ReadKey(true).Key;
 
@@ -99,7 +115,7 @@ try
                     selectedGpu = Math.Max(0, selectedGpu - 1);
             }
 
-            Thread.Sleep(25);
+            Thread.Sleep(keyPollIntervalMs);
         }
     }
 }
@@ -138,127 +154,9 @@ static IPlatformTelemetry CreateTelemetry()
 #endif
 }
 
-static string Render(
-    SystemSnapshot s,
-    GpuMetrics? gpu,
-    IReadOnlyList<Diagnostic> diagnostics,
-    int selectedGpu,
-    int width,
-    string spin)
-{
-    int w = Math.Clamp(width, 42, 96);
-    var b = new StringBuilder();
-
-    void Border() =>
-        b.Append('+').Append(new string('-', w - 2)).AppendLine("+");
-
-    void Row(string text = "")
-    {
-        string t = " " + text;
-        int inner = w - 2;
-
-        if (t.Length > inner)
-            t = t[..inner];
-
-        b.Append('|').Append(t.PadRight(inner)).AppendLine("|");
-    }
-
-    string Short(string value, int max) =>
-        value.Length <= max ? value : value[..Math.Max(1, max - 1)] + "…";
-
-    Border();
-    Row($"VIMON  {spin} LIVE");
-    Row("Q quit  P pause  <- / -> GPU");
-    Border();
-
-    Row("CPU");
-    Row(Short(s.Cpu?.Name ?? "Unknown CPU", w - 4));
-    Row($"Temp        {FmtMetric(s.Cpu?.TempC, " C", positiveOnly: true)}");
-    Row($"Load        {FmtMetric(s.Cpu?.LoadPct, " %")}");
-    Row($"Power       {FmtMetric(s.Cpu?.PackagePowerW, " W", positiveOnly: true)}");
-
-    if (s.Thermal is ThermalState thermal)
-        Row($"Thermal     {thermal}");
-
-    Border();
-
-    Row($"GPU {(s.Gpus.Count == 0 ? "0/0" : $"{selectedGpu + 1}/{s.Gpus.Count}")}");
-
-    if (gpu is null)
-    {
-        Row("No GPU detected");
-    }
-    else
-    {
-        Row(Short(gpu.Name, w - 4));
-        Row($"Core        {FmtMetric(gpu.CoreTempC, " C", positiveOnly: true)}");
-        Row($"Hotspot     {FmtMetric(gpu.HotspotTempC, " C", positiveOnly: true)}");
-        Row($"VRAM temp   {FmtMetric(gpu.MemoryTempC, " C", positiveOnly: true)}");
-        Row($"Load        {FmtMetric(gpu.UtilizationPct, " %")}");
-        Row($"Power       {FmtMetric(gpu.PowerW, " W", positiveOnly: true)}");
-        Row($"Fan         {FmtMetric(gpu.FanPct, " %")}");
-        Row($"PCIe        {Pcie(gpu)}");
-    }
-
-    Border();
-
-    Row("MEMORY");
-    Row($"RAM         {s.Memory.UsedGb:0.0} / {s.Memory.TotalGb:0.0} GB");
-    Row($"Usage       {s.Memory.LoadPct:0} %");
-
-    if (s.Memory.Pressure is MemoryPressure pressure)
-        Row($"Pressure    {pressure}");
-    Border();
-
-    Row("STORAGE");
-    if (s.Storage.Count == 0)
-    {
-        Row("Temperature —");
-    }
-    else
-    {
-        foreach (var drive in s.Storage.Take(3))
-            Row($"{Short(drive.Name, Math.Max(12, w - 20))}  {FmtMetric(drive.TempC, " C", positiveOnly: true)}");
-    }
-
-    Border();
-
-    Row("STATUS");
-    foreach (var diagnostic in diagnostics.Take(3))
-        Row(Short($"{diagnostic.Level}: {diagnostic.Message}", w - 4));
-
-    Border();
-
-    return b.ToString();
-}
-
-static string FmtMetric(double? value, string unit, bool positiveOnly = false)
-{
-    if (!value.HasValue || double.IsNaN(value.Value) || double.IsInfinity(value.Value))
-        return "—";
-
-    if (positiveOnly && value.Value <= 0)
-        return "—";
-
-    return $"{value.Value:0.#}{unit}";
-}
-
-static string Pcie(GpuMetrics gpu)
-{
-    if (!gpu.PcieGenerationCurrent.HasValue || !gpu.PcieWidthCurrent.HasValue)
-        return "—";
-
-    string current = $"Gen{gpu.PcieGenerationCurrent} x{gpu.PcieWidthCurrent}";
-
-    if (gpu.PcieGenerationMax.HasValue && gpu.PcieWidthMax.HasValue)
-        return $"{current} / max Gen{gpu.PcieGenerationMax} x{gpu.PcieWidthMax}";
-
-    return current;
-}
-
 static int GetSafeWidth()
 {
-    try { return Math.Max(42, Console.WindowWidth - 1); }
+    try { return Math.Max(FrameRenderer.MinWidth, Console.WindowWidth - 1); }
     catch { return 80; }
 }
 
