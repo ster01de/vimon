@@ -37,3 +37,14 @@ jobs:
           echo "$output"
           grep -q "Thermal" <<< "$output"
           grep -q "Pressure" <<< "$output"
+      - name: Publish macOS arm64 preview
+        run: |
+          dotnet publish src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 -r osx-arm64 \
+            --self-contained true -p:PublishSingleFile=true -o dist/osx-arm64
+          # Artifacts drop the executable bit, so ship a tarball that keeps it.
+          tar -czf vimon-macos-arm64.tar.gz -C dist/osx-arm64 vimon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vimon-macos-arm64
+          path: vimon-macos-arm64.tar.gz
+          retention-days: 14
