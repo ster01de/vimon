@@ -87,11 +87,12 @@ The binary is not code-signed yet, so SmartScreen may warn on first start (*More
 ### macOS
 
 ```bash
-VERSION=v0.3.1-alpha   # latest version from the releases page
-curl -LO https://github.com/ster01de/vimon/releases/download/$VERSION/vimon-macos-arm64.tar.gz
+curl -fLO https://github.com/ster01de/vimon/releases/download/v0.3.1-alpha/vimon-macos-arm64.tar.gz
 tar -xzf vimon-macos-arm64.tar.gz
 ./vimon
 ```
+
+Newer version on the [releases page](https://github.com/ster01de/vimon/releases)? Replace `v0.3.1-alpha` in the URL. `-f` makes `curl` stop on a wrong URL instead of saving GitHub's "Not Found" page, which `tar` would reject with *Unrecognized archive format*.
 
 Use `vimon-macos-x64.tar.gz` on Intel Macs. Downloaded with a browser instead of `curl`? Run `xattr -d com.apple.quarantine vimon` once, because the binaries are not notarized yet.
 

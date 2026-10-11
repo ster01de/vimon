@@ -7,11 +7,12 @@
 ## Install
 
 ```bash
-VERSION=v0.3.1-alpha   # latest version from the releases page
-curl -LO https://github.com/ster01de/vimon/releases/download/$VERSION/vimon-macos-arm64.tar.gz
+curl -fLO https://github.com/ster01de/vimon/releases/download/v0.3.1-alpha/vimon-macos-arm64.tar.gz
 tar -xzf vimon-macos-arm64.tar.gz
 ./vimon
 ```
+
+For a newer version, replace `v0.3.1-alpha` with the tag from the [releases page](https://github.com/ster01de/vimon/releases).
 
 | Mac | File |
 |---|---|
@@ -74,6 +75,15 @@ Press `H` to hide these rows.
 - **CPU temperature warnings** start at 80 °C for every machine today. Fanless MacBook Airs can run above that under sustained load by design. Apple Silicon thresholds are planned.
 - **Intel Macs** use different sensor keys. Support is built in but untested so far; reports are welcome.
 - **Virtual machines** usually expose no SMC sensors, so temperatures show `—` there.
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `tar: Error opening archive: Unrecognized archive format` | The download is GitHub's 9-byte "Not Found" page (check with `ls -l`). Fix the version in the URL and download again with `curl -fLO`. |
+| *"vimon" cannot be opened* | `xattr -d com.apple.quarantine vimon` |
+| Temperatures `—` | Expected in virtual machines without SMC sensors. |
+| Frame cut off with *… more lines* | Make the terminal window taller. |
 
 ## Build from source
 
