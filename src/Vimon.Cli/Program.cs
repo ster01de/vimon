@@ -12,6 +12,8 @@ using Vimon.Platform.MacOS;
 const int refreshIntervalMs = 500;
 const int keyPollIntervalMs = 25;
 const int onceWarmupMs = 500;
+const int onceRetryMs = 250;
+const int onceMaxWaitMs = 2000;
 
 using IPlatformTelemetry? telemetry = TryCreateTelemetry();
 
@@ -28,11 +30,19 @@ bool compact = args.Contains("--compact");
 
 if (args.Contains("--once"))
 {
-    // Some values (e.g. CPU load) are deltas between two samples, so take a warm-up sample first.
+    // CPU load is a delta between two samples. macOS tick counters can stall for ~800 ms, so keep
+    // sampling until load shows up instead of trusting a single warm-up interval.
     telemetry.Read();
     Thread.Sleep(onceWarmupMs);
 
     var snapshot = telemetry.Read();
+    long deadline = Environment.TickCount64 + onceMaxWaitMs;
+
+    while (snapshot.Cpu is not null && snapshot.Cpu.LoadPct is null && Environment.TickCount64 < deadline)
+    {
+        Thread.Sleep(onceRetryMs);
+        snapshot = telemetry.Read();
+    }
     var gpu = snapshot.Gpus.Count > 0 ? snapshot.Gpus[0] : null;
     var diagnostics = DiagnosticsEngine.Evaluate(snapshot);
 
