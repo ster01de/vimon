@@ -4,6 +4,15 @@ namespace Vimon.Cli;
 internal static class Sparkline
 {
     private const string Blocks = "▁▂▃▄▅▆▇█";
+    // The scale fits the recent values, but spans at least this much so sensor noise stays flat.
+    private const double TempMinSpanC = 10;
+    private const double TempMaxC = 130;
+    private const double LoadMinSpanPct = 20;
+    private const double LoadMaxPct = 100;
+
+    public static string ForTemperature(IReadOnlyList<double> values) => Fitted(values, TempMinSpanC, TempMaxC);
+
+    public static string ForLoad(IReadOnlyList<double> values) => Fitted(values, LoadMinSpanPct, LoadMaxPct);
 
     /// <summary>Values outside <paramref name="min"/>..<paramref name="max"/> are clamped to the edges.</summary>
     public static string Render(IReadOnlyList<double> values, double min, double max)
@@ -32,6 +41,12 @@ internal static class Sparkline
         double min = Math.Max(lowerBound, center - span / 2);
         double max = Math.Min(upperBound, min + span);
         return (Math.Max(lowerBound, max - span), max);
+    }
+
+    private static string Fitted(IReadOnlyList<double> values, double minSpan, double upperBound)
+    {
+        var (min, max) = Scale(values, minSpan, lowerBound: 0, upperBound);
+        return Render(values, min, max);
     }
 
     private static int Level(double value, double min, double max)
