@@ -15,4 +15,5 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - run: dotnet restore Vimon.sln
-      - run: dotnet build Vimon.sln -c Release
+      - run: dotnet build Vimon.sln -c Release --no-restore
+      - run: dotnet test Vimon.sln -c Release --no-build
