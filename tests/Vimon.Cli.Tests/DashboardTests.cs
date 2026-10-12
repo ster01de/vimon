@@ -219,6 +219,21 @@ public class DashboardTests
     }
 
     [Fact]
+    public void NamesTheProcessCausingTheDiskTraffic()
+    {
+        var snapshot = new SystemSnapshot(DateTimeOffset.UnixEpoch, new CpuMetrics("Test CPU", 50, 10, 20, 3000), [], Memory,
+            [new StorageMetrics("SSD", null) { ReadBytesPerSec = 0, WriteBytesPerSec = 110_000_000 }])
+        {
+            TopDiskProcesses = [new ProcessUsage(9, "Finder", 1, 0) { DiskReadBytesPerSec = 0, DiskWriteBytesPerSec = 110_000_000 }]
+        };
+
+        string busiest = LineWith(Render(snapshot), "Busiest");
+
+        Assert.Contains("Finder  W 110 MB/s", busiest);
+        Assert.DoesNotContain("R ", busiest.Replace("Busiest", ""));
+    }
+
+    [Fact]
     public void ShowsGpuMemoryUsedAndTotal()
     {
         string output = Render(Snapshot(gpus: Gpu(memoryUsedGb: 1.5, memoryTotalGb: 24)));

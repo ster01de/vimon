@@ -243,7 +243,7 @@ SystemSnapshot ReadSnapshot()
     // Names come from sources other people control (volume labels, adapter names), so no raw
     // escape sequence may reach the terminal.
     var read = TerminalText.Clean(telemetry.Read());
-    return cli.NoProcesses ? read with { TopProcesses = [], ProcessScope = ProcessScope.None } : read;
+    return cli.NoProcesses ? read with { TopProcesses = [], TopDiskProcesses = [], ProcessScope = ProcessScope.None } : read;
 }
 
 void WriteOnce(SystemSnapshot s)

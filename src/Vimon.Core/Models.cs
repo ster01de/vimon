@@ -79,6 +79,9 @@ public sealed record SystemSnapshot(
 
     public ProcessScope ProcessScope { get; init; } = ProcessScope.None;
 
+    /// <summary>The processes reading or writing the most right now, busiest first; same scope as <see cref="TopProcesses"/>.</summary>
+    public IReadOnlyList<ProcessUsage> TopDiskProcesses { get; init; } = [];
+
     /// <summary>Free space of the user's volumes; empty where the backend does not read them.</summary>
     public IReadOnlyList<VolumeSpace> Volumes { get; init; } = [];
 }

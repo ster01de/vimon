@@ -4,10 +4,24 @@ namespace Vimon.Core;
 public readonly record struct ProcessKey(int Pid, long StartTicks);
 
 /// <summary>Cumulative CPU time and memory of one process at one moment.</summary>
-public sealed record ProcessTimes(ProcessKey Key, string Name, TimeSpan CpuTime, ulong ResidentBytes);
+public sealed record ProcessTimes(ProcessKey Key, string Name, TimeSpan CpuTime, ulong ResidentBytes)
+{
+    /// <summary>Cumulative bytes the process read from and wrote to storage; null where the OS does not tell.</summary>
+    public ulong? DiskReadBytes { get; init; }
+
+    public ulong? DiskWriteBytes { get; init; }
+}
 
 /// <param name="CpuPct">Share of the whole machine, 0–100 like the CPU load; null until two samples exist.</param>
-public sealed record ProcessUsage(int Pid, string Name, double? CpuPct, ulong ResidentBytes);
+public sealed record ProcessUsage(int Pid, string Name, double? CpuPct, ulong ResidentBytes)
+{
+    /// <summary>Bytes per second; null until two samples exist.</summary>
+    public double? DiskReadBytesPerSec { get; init; }
+
+    public double? DiskWriteBytesPerSec { get; init; }
+
+    public double DiskBytesPerSec => (DiskReadBytesPerSec ?? 0) + (DiskWriteBytesPerSec ?? 0);
+}
 
 /// <summary>Which processes a backend can see.</summary>
 public enum ProcessScope

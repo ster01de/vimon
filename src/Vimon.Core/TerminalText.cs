@@ -23,6 +23,7 @@ public static class TerminalText
         Storage = s.Storage.Select(d => d with { Name = Clean(d.Name) }).ToList(),
         Network = s.Network.Select(n => n with { Name = Clean(n.Name) }).ToList(),
         TopProcesses = s.TopProcesses.Select(p => p with { Name = ProcessName.Clean(p.Name, p.Pid) }).ToList(),
+        TopDiskProcesses = s.TopDiskProcesses.Select(p => p with { Name = ProcessName.Clean(p.Name, p.Pid) }).ToList(),
         Volumes = s.Volumes
             .Select(v => v with { Name = Clean(v.Name), MountPoint = Clean(v.MountPoint), FileSystem = Clean(v.FileSystem) })
             .ToList()

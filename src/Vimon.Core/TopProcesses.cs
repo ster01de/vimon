@@ -21,6 +21,16 @@ public static class TopProcesses
             .Take(count)
             .ToList();
 
+    /// <summary>The processes moving the most bytes to or from storage; idle ones are left out.</summary>
+    public static IReadOnlyList<ProcessUsage> SelectByDisk(IEnumerable<ProcessUsage> usages, int count) =>
+        usages
+            .Where(u => u.DiskBytesPerSec > 0)
+            .OrderByDescending(u => u.DiskBytesPerSec)
+            .ThenBy(u => u.Name, StringComparer.Ordinal)
+            .ThenBy(u => u.Pid)
+            .Take(count)
+            .ToList();
+
     /// <summary>
     /// Processes are read less often than other sensors. The first two reads are back to back so a
     /// one-shot run gets CPU values; after that one read per <paramref name="interval"/>.

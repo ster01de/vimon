@@ -3,19 +3,20 @@ using System.Collections.Immutable;
 namespace Vimon.Core;
 
 /// <summary>
-/// Turns cumulative CPU time per process into a share of the whole machine. Immutable:
-/// <see cref="Advance"/> returns the usages together with the tracker for the next sample.
+/// Turns cumulative CPU time and disk bytes per process into a share of the whole machine and
+/// bytes per second. Immutable: <see cref="Advance"/> returns the usages together with the tracker
+/// for the next sample.
 /// </summary>
 public sealed class ProcessCpuTracker
 {
     private const double MaxPct = 100;
 
-    public static readonly ProcessCpuTracker Empty = new(ImmutableDictionary<ProcessKey, TimeSpan>.Empty, sampledAt: null);
+    public static readonly ProcessCpuTracker Empty = new(ImmutableDictionary<ProcessKey, ProcessTimes>.Empty, sampledAt: null);
 
-    private readonly ImmutableDictionary<ProcessKey, TimeSpan> _previous;
+    private readonly ImmutableDictionary<ProcessKey, ProcessTimes> _previous;
     private readonly TimeSpan? _sampledAt;
 
-    private ProcessCpuTracker(ImmutableDictionary<ProcessKey, TimeSpan> previous, TimeSpan? sampledAt)
+    private ProcessCpuTracker(ImmutableDictionary<ProcessKey, ProcessTimes> previous, TimeSpan? sampledAt)
     {
         _previous = previous;
         _sampledAt = sampledAt;
@@ -24,34 +25,44 @@ public sealed class ProcessCpuTracker
     /// <param name="now">Monotonic time of this sample.</param>
     /// <param name="coreCount">Logical cores; one busy thread on 8 cores counts as 12.5 %.</param>
     /// <returns>
-    /// One usage per process. CPU is null on the first sample of a process, when no time has
-    /// passed, or when its CPU time went backwards.
+    /// One usage per process. A value is null on the first sample of a process, when no time has
+    /// passed, or when its counter went backwards.
     /// </returns>
     public (IReadOnlyList<ProcessUsage> Usages, ProcessCpuTracker Next) Advance(
         IReadOnlyList<ProcessTimes> samples, TimeSpan now, int coreCount)
     {
-        double? capacitySeconds = _sampledAt is TimeSpan before && now > before && coreCount > 0
-            ? (now - before).TotalSeconds * coreCount
-            : null;
+        double? elapsedSeconds = _sampledAt is TimeSpan before && now > before ? (now - before).TotalSeconds : null;
 
         var unique = samples.GroupBy(s => s.Key).Select(group => group.Last()).ToList();
-        var usages = unique
-            .Select(s => new ProcessUsage(s.Key.Pid, s.Name, CpuPct(s, capacitySeconds), s.ResidentBytes))
-            .ToList();
-        var next = unique.ToImmutableDictionary(s => s.Key, s => s.CpuTime);
+        var usages = unique.Select(s => Usage(s, elapsedSeconds, coreCount)).ToList();
+        var next = unique.ToImmutableDictionary(s => s.Key);
 
         return (usages, new ProcessCpuTracker(next, now));
     }
 
-    private double? CpuPct(ProcessTimes sample, double? capacitySeconds)
+    private ProcessUsage Usage(ProcessTimes sample, double? elapsedSeconds, int coreCount)
     {
-        if (capacitySeconds is not double capacity
-            || !_previous.TryGetValue(sample.Key, out var before)
-            || sample.CpuTime < before)
-        {
-            return null;
-        }
+        var usage = new ProcessUsage(sample.Key.Pid, sample.Name, CpuPct: null, sample.ResidentBytes);
 
-        return Math.Clamp((sample.CpuTime - before).TotalSeconds / capacity * 100, 0, MaxPct);
+        if (elapsedSeconds is not double seconds || !_previous.TryGetValue(sample.Key, out var before))
+            return usage;
+
+        return usage with
+        {
+            CpuPct = CpuPct(before.CpuTime, sample.CpuTime, seconds, coreCount),
+            DiskReadBytesPerSec = PerSecond(before.DiskReadBytes, sample.DiskReadBytes, seconds),
+            DiskWriteBytesPerSec = PerSecond(before.DiskWriteBytes, sample.DiskWriteBytes, seconds)
+        };
     }
+
+    private static double? CpuPct(TimeSpan before, TimeSpan after, double seconds, int coreCount)
+    {
+        if (coreCount <= 0 || after < before)
+            return null;
+
+        return Math.Clamp((after - before).TotalSeconds / (seconds * coreCount) * 100, 0, MaxPct);
+    }
+
+    private static double? PerSecond(ulong? before, ulong? after, double seconds) =>
+        before is ulong b && after is ulong a && a >= b ? (a - b) / seconds : null;
 }

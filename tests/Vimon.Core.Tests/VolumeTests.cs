@@ -82,7 +82,8 @@ public class VolumeTests
         {
             Network = [new InterfaceRate(evil, null, null)],
             Volumes = [new VolumeSpace(evil, "/Volumes/" + evil, evil, 1, 2)],
-            TopProcesses = [new ProcessUsage(7, evil, null, 0)]
+            TopProcesses = [new ProcessUsage(7, evil, null, 0)],
+            TopDiskProcesses = [new ProcessUsage(8, evil, null, 0)]
         };
 
         var clean = TerminalText.Clean(snapshot);
@@ -90,7 +91,8 @@ public class VolumeTests
         string[] names =
         [
             clean.Cpu!.Name, clean.Gpus[0].Name, clean.Storage[0].Name, clean.Network[0].Name,
-            clean.Volumes[0].Name, clean.Volumes[0].MountPoint, clean.Volumes[0].FileSystem, clean.TopProcesses[0].Name
+            clean.Volumes[0].Name, clean.Volumes[0].MountPoint, clean.Volumes[0].FileSystem, clean.TopProcesses[0].Name,
+            clean.TopDiskProcesses[0].Name
         ];
         Assert.All(names, name => Assert.DoesNotContain(name, c => char.IsControl(c) || c == '\u202E'));
         Assert.Equal("USB]0;pwned[2J", clean.Volumes[0].Name);
