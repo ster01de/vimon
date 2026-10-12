@@ -16,6 +16,7 @@ internal static class DiskPanel
     private const int BarWidth = 6;
     private const int NameWidth = 16;
     private const int RateWidth = 10;
+    private const int ProcessNameWidth = 18;
 
     /// <returns>Label/value rows; a null value is a missing reading.</returns>
     public static List<(string Label, string? Value)> Rows(SystemSnapshot s, MetricHistory h, HealthThresholds t, Theme theme)
@@ -28,6 +29,9 @@ internal static class DiskPanel
             rows.Add(("Read", Rate(read, h.DiskReadBps, theme)));
             rows.Add(("Write", Rate(write, h.DiskWriteBps, theme)));
         }
+
+        if (s.TopDiskProcesses.Count > 0)
+            rows.Add(("Busiest", BusiestProcess(s.TopDiskProcesses[0])));
 
         // The startup disk first, then the others by name, so rows keep their place.
         rows.AddRange(s.Volumes
@@ -44,6 +48,20 @@ internal static class DiskPanel
             .SelectMany(drive => DriveRows(drive, theme)));
 
         return rows;
+    }
+
+    /// <summary>Which process causes the traffic, e.g. <c>Finder  W 110 MB/s</c>; idle directions are left out.</summary>
+    private static string BusiestProcess(ProcessUsage process)
+    {
+        var parts = new List<string> { Markup.Escape(MetricFormat.Truncate(process.Name, ProcessNameWidth)) };
+
+        if (process.DiskReadBytesPerSec > 0)
+            parts.Add($"R {MetricFormat.Throughput(process.DiskReadBytesPerSec)}");
+
+        if (process.DiskWriteBytesPerSec > 0)
+            parts.Add($"W {MetricFormat.Throughput(process.DiskWriteBytesPerSec)}");
+
+        return string.Join("  ", parts);
     }
 
     /// <summary>The drive row, plus a row with its USB link below, so neither gets too long for a side-by-side panel.</summary>

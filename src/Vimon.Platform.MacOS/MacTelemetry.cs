@@ -39,6 +39,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
     public SystemSnapshot Read()
     {
         var temperatures = _temperatures?.Read() ?? MacTemperatureReading.None;
+        var processes = _processes.Read();
 
         return new SystemSnapshot(
             DateTimeOffset.Now,
@@ -49,7 +50,8 @@ public sealed class MacTelemetry : IPlatformTelemetry
         {
             Thermal = _thermal.Read(),
             Network = _network.Read(),
-            TopProcesses = _processes.Read(),
+            TopProcesses = processes.Top,
+            TopDiskProcesses = processes.TopDisk,
             ProcessScope = ProcessScope.CurrentUser,
             Volumes = _volumes.Read()
         };

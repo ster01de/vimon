@@ -62,6 +62,24 @@ public class ProcessCpuTrackerTests
     }
 
     [Fact]
+    public void ReportsDiskBytesPerSecond()
+    {
+        var first = Sample(Xcode, 5) with { DiskReadBytes = 1_000, DiskWriteBytes = 0 };
+        var second = Sample(Xcode, 5) with { DiskReadBytes = 1_000, DiskWriteBytes = 220_000_000 };
+
+        var usage = Second(first, second, elapsedSeconds: 2);
+
+        Assert.Equal(0, usage.DiskReadBytesPerSec);
+        Assert.Equal(110_000_000, usage.DiskWriteBytesPerSec);
+    }
+
+    [Fact]
+    public void ReportsNoDiskRateWithoutCounters()
+    {
+        Assert.Null(Second(Sample(Xcode, 5), Sample(Xcode, 6)).DiskWriteBytesPerSec);
+    }
+
+    [Fact]
     public void CountsAProcessListedTwiceOnlyOnce()
     {
         var (usages, _) = ProcessCpuTracker.Empty.Advance([Sample(Xcode, 1), Sample(Xcode, 2)], Start, Cores);
@@ -98,6 +116,21 @@ public class TopProcessesTests
         var names = TopProcesses.Select([Usage(1, "b", 0.04, 10), Usage(2, "a", 0.01, 20)], 2).Select(u => u.Name);
 
         Assert.Equal(new[] { "a", "b" }, names);
+    }
+
+    [Fact]
+    public void PicksTheProcessesMovingTheMostDataAndSkipsIdleOnes()
+    {
+        var usages = new[]
+        {
+            Usage(1, "idle", 50) with { DiskReadBytesPerSec = 0, DiskWriteBytesPerSec = 0 },
+            Usage(2, "Finder", 1) with { DiskWriteBytesPerSec = 110_000_000 },
+            Usage(3, "mds", 2) with { DiskReadBytesPerSec = 4_000_000 }
+        };
+
+        var names = TopProcesses.SelectByDisk(usages, 5).Select(u => u.Name);
+
+        Assert.Equal(new[] { "Finder", "mds" }, names);
     }
 
     [Fact]

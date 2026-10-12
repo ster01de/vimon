@@ -103,6 +103,7 @@ Not available yet: the Linux backend is planned.
 | Free disk space per volume | ✓ | ✓ |
 | Disk throughput per drive (read, write) | ✓ ¹ | ✓ |
 | USB link of external drives (USB 2.0 … USB 3.2 Gen 2x2) | — | ✓ |
+| Process causing the most disk traffic | planned | ✓ ⁶ |
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 | Busiest processes (CPU, memory) | planned | ✓ ⁶ |
@@ -275,7 +276,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
 - [ ] Busiest processes on Windows
-- [ ] Busiest disk process
+- [ ] Busiest disk process on Windows
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
 - [ ] AI section: local inference servers, loaded model, tokens per second

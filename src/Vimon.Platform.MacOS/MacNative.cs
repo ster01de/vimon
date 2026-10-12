@@ -42,6 +42,10 @@ internal static class MacNative
     [DllImport(LibSystem)]
     public static extern int mach_timebase_info(out MachTimebaseInfo info);
 
+    /// <returns>0 on success; fails (EPERM) for processes of other users.</returns>
+    [DllImport(LibSystem, SetLastError = true)]
+    public static extern int proc_pid_rusage(int pid, int flavor, byte[] buffer);
+
     [DllImport(LibSystem)]
     public static extern uint mach_host_self();
 
