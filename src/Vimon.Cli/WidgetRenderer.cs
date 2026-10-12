@@ -178,12 +178,12 @@ internal static class WidgetRenderer
     }
 
     private static string Spark(string blocks, Theme theme) =>
-        blocks.Length == 0 ? "" : $"{new string(' ', SparkGap)}[{theme.Accent}]{blocks}[/]";
+        blocks.Length == 0 ? "" : $"{new string(' ', SparkGap)}[{theme.Accent}]{theme.Glyphs.Spark(blocks)}[/]";
 
     private static string Bar(double percent, string color, Theme theme)
     {
         int filled = MetricFormat.FilledCells(percent, SparkLength);
-        return $"[{color}]{new string('█', filled)}[/][{theme.Muted}]{new string('░', SparkLength - filled)}[/]";
+        return $"[{color}]{new string(theme.Glyphs.BarFull, filled)}[/][{theme.Muted}]{new string(theme.Glyphs.BarEmpty, SparkLength - filled)}[/]";
     }
 
     private static void AddIfPresent(List<string> lines, string? line)

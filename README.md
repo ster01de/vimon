@@ -161,6 +161,7 @@ Options:
 --hide-missing   start with rows without a value hidden
 --theme <name>   default, mono or high-contrast (see below)
 --no-processes   hide process names, e.g. while sharing your screen
+--ascii          plain ASCII symbols, for consoles whose font lacks the others
 ```
 
 The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. Each frame is drawn from the top-left corner, so resizing the window never leaves broken pieces behind. If the window is too short, the view is cut from the bottom; STATUS always stays visible.

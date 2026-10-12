@@ -72,7 +72,7 @@ internal static class DiskPanel
         if (drive.UsbLink is UsbSpeed link)
         {
             string color = UsbSpeeds.IsSlow(link) ? theme.Info : theme.Muted;
-            yield return ("", $"[{color}]↳ {UsbSpeeds.Describe(link)}[/]");
+            yield return ("", $"[{color}]{theme.Glyphs.Branch} {UsbSpeeds.Describe(link)}[/]");
         }
     }
 
@@ -82,7 +82,7 @@ internal static class DiskPanel
             return null;
 
         string blocks = Sparkline.ForThroughput(history);
-        return blocks.Length == 0 ? text : $"{text,-RateWidth} [{theme.Accent}]{blocks}[/]";
+        return blocks.Length == 0 ? text : $"{text,-RateWidth} [{theme.Accent}]{theme.Glyphs.Spark(blocks)}[/]";
     }
 
     /// <returns>Rates, attachment and temperature of one drive, or null when none is known.</returns>
@@ -119,7 +119,7 @@ internal static class DiskPanel
     {
         string color = theme.Of(DiagnosticsEngine.VolumeLevel(volume, t));
         int filled = MetricFormat.FilledCells(volume.UsedPct, BarWidth);
-        string bar = $"[{color}]{new string('█', filled)}[/][{theme.Muted}]{new string('░', BarWidth - filled)}[/]";
+        string bar = $"[{color}]{new string(theme.Glyphs.BarFull, filled)}[/][{theme.Muted}]{new string(theme.Glyphs.BarEmpty, BarWidth - filled)}[/]";
         string fileSystem = volume.FileSystem.Length > 0 ? $" [{theme.Muted}]{Markup.Escape(volume.FileSystem)}[/]" : "";
 
         return $"{bar} [{color}]{volume.UsedPct:0} %[/] · {MetricFormat.Memory(volume.FreeBytes)} free{fileSystem}";

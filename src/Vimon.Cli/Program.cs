@@ -46,7 +46,7 @@ Console.OutputEncoding = Encoding.UTF8;
 
 bool hideMissing = cli.HideMissing;
 var mode = cli.Mode;
-var theme = ApplyTheme(cli.Theme);
+var theme = ApplyGlyphs(ApplyTheme(cli.Theme), cli.Ascii);
 
 if (cli.Once)
 {
@@ -282,6 +282,22 @@ static Theme ApplyTheme(Theme? requested)
         capabilities.ColorSystem = ColorSystem.Standard;
 
     return theme;
+}
+
+// The classic Windows console shows symbols its font lacks as '?'. Switching Spectre's Unicode
+// capability off makes it use an ASCII spinner and square borders; vimon's own symbols follow.
+static Theme ApplyGlyphs(Theme theme, bool asciiRequested)
+{
+    bool legacyConsole = Glyphs.IsLegacyWindowsConsole(
+        OperatingSystem.IsWindows(),
+        Environment.GetEnvironmentVariable("WT_SESSION"),
+        Environment.GetEnvironmentVariable("TERM_PROGRAM"));
+
+    if (!asciiRequested && !legacyConsole && AnsiConsole.Profile.Capabilities.Unicode)
+        return theme;
+
+    AnsiConsole.Profile.Capabilities.Unicode = false;
+    return theme with { Glyphs = Glyphs.Safe };
 }
 
 static GpuMetrics? GpuAt(SystemSnapshot s, int index) =>

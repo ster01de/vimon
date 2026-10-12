@@ -5,18 +5,21 @@ internal enum ViewMode { Full, Compact, Widget }
 /// <summary>Command-line flags. <c>--widget</c> wins over <c>--compact</c>.</summary>
 /// <param name="Theme">The theme from <c>--theme</c>; null when none was given.</param>
 /// <param name="NoProcesses">Hide process names, e.g. while sharing the screen.</param>
-internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing, Theme? Theme = null, bool NoProcesses = false)
+/// <param name="Ascii">Draw with plain ASCII symbols, for consoles whose font lacks the others.</param>
+internal sealed record CliOptions(
+    bool Once, ViewMode Mode, bool HideMissing, Theme? Theme = null, bool NoProcesses = false, bool Ascii = false)
 {
     private const string OnceFlag = "--once";
     private const string CompactFlag = "--compact";
     private const string WidgetFlag = "--widget";
     private const string HideMissingFlag = "--hide-missing";
     private const string NoProcessesFlag = "--no-processes";
+    private const string AsciiFlag = "--ascii";
     private const string ThemeFlag = "--theme";
     private const string ThemeAssignment = ThemeFlag + "=";
     private const string OptionPrefix = "--";
 
-    private static readonly string[] Switches = [OnceFlag, CompactFlag, WidgetFlag, HideMissingFlag, NoProcessesFlag];
+    private static readonly string[] Switches = [OnceFlag, CompactFlag, WidgetFlag, HideMissingFlag, NoProcessesFlag, AsciiFlag];
 
     private static string Usage => $"Options: {string.Join(", ", Switches)}, {ThemeFlag} <name>. Themes: {Cli.Theme.NameList}";
 
@@ -45,7 +48,8 @@ internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing, Th
             : ViewMode.Full;
 
         return new CliOptions(
-            switches.Contains(OnceFlag), mode, switches.Contains(HideMissingFlag), theme, switches.Contains(NoProcessesFlag));
+            switches.Contains(OnceFlag), mode, switches.Contains(HideMissingFlag), theme,
+            switches.Contains(NoProcessesFlag), switches.Contains(AsciiFlag));
     }
 
     /// <summary>The C key switches full and compact; the widget stays a widget.</summary>

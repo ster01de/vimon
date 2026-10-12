@@ -51,4 +51,7 @@ internal sealed record Theme(
     public Style StyleOf(HealthLevel level) => Style.Parse(Of(level));
 
     public Style MutedStyle => Style.Parse(Muted);
+
+    /// <summary>The symbols to draw with; <see cref="Glyphs.Safe"/> in consoles whose font lacks them.</summary>
+    public Glyphs Glyphs { get; init; } = Glyphs.Unicode;
 }

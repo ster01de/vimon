@@ -22,7 +22,6 @@ internal static class Dashboard
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
     private const int MaxNetworkInterfaces = 3;
-    private const string FindingDot = "●";
 
     public static IRenderable Build(
         SystemSnapshot s,
@@ -85,7 +84,7 @@ internal static class Dashboard
     }
 
     private static string FindingMarker(HealthLevel level, Theme theme) =>
-        theme.MarksFindings ? HealthStyle.PaddedToken(level) : FindingDot;
+        theme.MarksFindings ? HealthStyle.PaddedToken(level) : theme.Glyphs.Bullet;
 
     private static Panel CpuPanel(SystemSnapshot s, MetricHistory h, DashboardOptions o, HealthThresholds t, Theme theme)
     {
@@ -301,11 +300,11 @@ internal static class Dashboard
     }
 
     private static string Spark(string blocks, Theme theme) =>
-        blocks.Length == 0 ? "" : $" [{theme.Accent}]{blocks}[/]";
+        blocks.Length == 0 ? "" : $" [{theme.Accent}]{theme.Glyphs.Spark(blocks)}[/]";
 
     private static string Bar(double percent, string color, Theme theme)
     {
         int filled = MetricFormat.FilledCells(percent, BarWidth);
-        return $"[{color}]{new string('█', filled)}[/][{theme.Muted}]{new string('░', BarWidth - filled)}[/]";
+        return $"[{color}]{new string(theme.Glyphs.BarFull, filled)}[/][{theme.Muted}]{new string(theme.Glyphs.BarEmpty, BarWidth - filled)}[/]";
     }
 }
