@@ -251,9 +251,11 @@ void WriteOnce(SystemSnapshot s)
 static Theme ApplyTheme(Theme? requested)
 {
     var capabilities = AnsiConsole.Profile.Capabilities;
-    var (theme, forceColor) = ThemeResolver.Resolve(requested, capabilities.ColorSystem != ColorSystem.NoColors);
+    var (theme, forceColor) = ThemeResolver.Resolve(
+        requested, consoleHasColor: capabilities.ColorSystem != ColorSystem.NoColors, canForceColor: capabilities.Ansi);
 
-    if (forceColor && capabilities.Ansi)
+    // 16 colours are enough for every theme and work in every ANSI terminal.
+    if (forceColor)
         capabilities.ColorSystem = ColorSystem.Standard;
 
     return theme;

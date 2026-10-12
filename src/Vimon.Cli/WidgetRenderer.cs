@@ -94,8 +94,10 @@ internal static class WidgetRenderer
             .Take(MaxFindings)
             .Select(d =>
             {
-                string message = MetricFormat.Truncate(d.Message, width - FindingIndent.Length);
-                return $"{FindingIndent}[{theme.Of(d.Level)}]{Markup.Escape(message)}[/]";
+                // Without colour, a token tells warnings and critical findings apart.
+                string prefix = theme.MarksFindings ? HealthStyle.PaddedToken(d.Level) + " " : FindingIndent;
+                string message = MetricFormat.Truncate(d.Message, width - prefix.Length);
+                return $"[{theme.Of(d.Level)}]{prefix}{Markup.Escape(message)}[/]";
             });
 
     /// <returns>Null when neither temperature nor load is known, so the row disappears.</returns>

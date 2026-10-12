@@ -176,7 +176,7 @@ set -g status-right '#(vimon --once --compact | head -1)'
 | `high-contrast` | bright colours for dark or transparent backgrounds, e.g. the desktop widget |
 | `mono` | no colours: findings are marked `OK` / `INFO` / `WARN` / `CRIT`, warnings are bold |
 
-Status never depends on colour alone: the STATUS header names the worst level in every theme (`STATUS · WARN`). vimon follows [`NO_COLOR`](https://no-color.org): when it is set, or the terminal has no colours, vimon switches to `mono`. An explicit `--theme` wins over `NO_COLOR`. `--compact` is plain text in every theme.
+Status never depends on colour alone: the STATUS header names the worst level in every theme (`STATUS · WARN`). vimon follows [`NO_COLOR`](https://no-color.org): when it is set, or the terminal has no colours, vimon switches to `mono`. An explicit `--theme` wins over `NO_COLOR`. Output written to a file or pipe (`vimon --once > status.txt`) has no colours either, so it uses the `mono` markers too. `--compact` is plain text in every theme.
 
 ### Widget view
 

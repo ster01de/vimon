@@ -114,6 +114,17 @@ public class WidgetRendererTests
     }
 
     [Fact]
+    public void MonoMarksEachFindingWithItsLevel()
+    {
+        var snapshot = Snapshot(Cpu(tempC: 85, loadPct: 10), Gpu(coreTempC: 90));
+
+        var lines = Lines(Render(snapshot, theme: Theme.Mono));
+
+        Assert.Equal("CRIT Test GPU: GPU 90°C", lines[1]);
+        Assert.StartsWith("WARN CPU 85°C", lines[2]);
+    }
+
+    [Fact]
     public void HighContrastUsesItsOwnCriticalStyle()
     {
         string output = Render(Snapshot(Cpu(tempC: 95, loadPct: 10)), ansi: true, theme: Theme.HighContrast);

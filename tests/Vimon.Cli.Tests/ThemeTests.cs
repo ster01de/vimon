@@ -56,14 +56,17 @@ public class ThemeTests
 public class ThemeResolverTests
 {
     [Theory]
-    [InlineData(null, true, "default", false)]
-    [InlineData(null, false, "mono", false)]
-    [InlineData("default", true, "default", false)]
-    [InlineData("high-contrast", false, "high-contrast", true)]
-    [InlineData("mono", false, "mono", false)]
-    public void PicksTheThemeAndWhetherToForceColour(string? requested, bool consoleHasColor, string expected, bool forceColor)
+    [InlineData(null, true, true, "default", false)]
+    [InlineData(null, false, true, "mono", false)]
+    [InlineData("default", true, true, "default", false)]
+    [InlineData("high-contrast", false, true, "high-contrast", true)]
+    [InlineData("high-contrast", false, false, "mono", false)]
+    [InlineData("mono", true, true, "mono", false)]
+    public void PicksTheThemeAndWhetherToForceColour(
+        string? requested, bool consoleHasColor, bool canForceColor, string expected, bool forceColor)
     {
-        var (theme, force) = ThemeResolver.Resolve(requested is null ? null : Theme.Find(requested), consoleHasColor);
+        var (theme, force) = ThemeResolver.Resolve(
+            requested is null ? null : Theme.Find(requested), consoleHasColor, canForceColor);
 
         Assert.Equal(expected, theme.Name);
         Assert.Equal(forceColor, force);
