@@ -142,7 +142,8 @@ public class DashboardTests
     [Fact]
     public void ListsTheBusiestProcessesOfTheUser()
     {
-        var snapshot = WithProcesses(Snapshot(), new(1, "Xcode", 23.4, 4UL << 30), new(2, "Finder", null, 300UL << 20));
+        var snapshot = WithProcesses(
+            Snapshot(), new ProcessUsage(1, "Xcode", 23.4, 4UL << 30), new ProcessUsage(2, "Finder", null, 300UL << 20));
 
         string output = Render(snapshot);
 
@@ -155,7 +156,7 @@ public class DashboardTests
     [Fact]
     public void EscapesAndShortensProcessNames()
     {
-        var snapshot = WithProcesses(Snapshot(), new(1, "[evil] " + new string('x', 40), 1, 1));
+        var snapshot = WithProcesses(Snapshot(), new ProcessUsage(1, "[evil] " + new string('x', 40), 1, 1));
 
         string output = Render(snapshot);
 
