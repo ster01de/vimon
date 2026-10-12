@@ -56,7 +56,13 @@ public sealed record SystemSnapshot(
 {
     /// <summary>OS-reported thermal state where the platform exposes it (macOS); otherwise null.</summary>
     public ThermalState? Thermal { get; init; }
+
+    /// <summary>Physical network interfaces; empty where the backend does not read them yet.</summary>
+    public IReadOnlyList<InterfaceRate> Network { get; init; } = [];
 }
+
+/// <summary>Bytes per second of one interface; null until two samples exist or after a counter reset.</summary>
+public sealed record InterfaceRate(string Name, double? DownBytesPerSec, double? UpBytesPerSec);
 
 public enum ThermalState { Nominal, Fair, Serious, Critical }
 
