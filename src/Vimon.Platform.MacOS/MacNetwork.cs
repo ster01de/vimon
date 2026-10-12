@@ -5,8 +5,10 @@ using Vimon.Core;
 namespace Vimon.Platform.MacOS;
 
 /// <summary>
-/// Network throughput per physical interface from the 64-bit routing-table counters. No root
-/// needed. getifaddrs is not used because its 32-bit counters wrap every 4 GB.
+/// Network throughput per physical interface from the routing-table byte counters. No root
+/// needed. Although if_data64 has 64-bit fields, macOS hands unprivileged processes only the low
+/// 32 bits, rounded to 1 KB (seen on macOS 13: getifaddrs reports the same values), so the
+/// tracker bridges the wrap every 4 GB.
 /// </summary>
 internal sealed class MacNetwork
 {
@@ -18,11 +20,12 @@ internal sealed class MacNetwork
     private const int IffRunning = 0x40;
     private const int Enomem = 12;
     private const int MaxReadAttempts = 3;
+    private const ulong CounterRange = 1UL << 32;
 
     private static readonly int[] Mib = [CtlNet, PfRoute, 0, 0, NetRtIfList2, 0];
 
     private readonly long _start = Stopwatch.GetTimestamp();
-    private ByteRateTracker _tracker = ByteRateTracker.Empty;
+    private ByteRateTracker _tracker = ByteRateTracker.WrappingAt(CounterRange);
 
     /// <returns>Rates of the physical interfaces that are up; empty when the table cannot be read.</returns>
     public IReadOnlyList<InterfaceRate> Read()

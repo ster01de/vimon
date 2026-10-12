@@ -37,6 +37,28 @@ public class ByteRateTrackerTests
     }
 
     [Fact]
+    public void BridgesTheWrapOfCountersThatKeepOnlyTheirLowBits()
+    {
+        var tracker = ByteRateTracker.WrappingAt(1UL << 32);
+        var (_, next) = tracker.Advance([En0(uint.MaxValue - 999, 0)], Start);
+
+        var (rates, _) = next.Advance([En0(1000, 0)], Start + TimeSpan.FromSeconds(1));
+
+        Assert.Equal(new InterfaceRate("en0", 2000, 0), Assert.Single(rates));
+    }
+
+    [Fact]
+    public void TreatsASmallDropAsAResetEvenWhenCountersWrap()
+    {
+        var tracker = ByteRateTracker.WrappingAt(1UL << 32);
+        var (_, next) = tracker.Advance([En0(5000, 0)], Start);
+
+        var (rates, _) = next.Advance([En0(1000, 0)], Start + TimeSpan.FromSeconds(1));
+
+        Assert.Null(Assert.Single(rates).DownBytesPerSec);
+    }
+
+    [Fact]
     public void ReportsNoRateForAnInterfaceThatJustAppeared()
     {
         var (_, tracker) = ByteRateTracker.Empty.Advance([En0(1000, 500)], Start);
