@@ -41,6 +41,10 @@ internal static class CompactRenderer
         var (down, up) = NetworkTotals.Of(s.Network);
         AddSegment(segments, "NET", Arrow("↓", down), Arrow("↑", up));
 
+        // R/W rather than arrows: for a drive, "down" and "up" would be ambiguous.
+        var (read, write) = DiskTotals.Of(s.Storage);
+        AddSegment(segments, "DISK", Arrow("R", read), Arrow("W", write));
+
         var lines = new List<string> { string.Join(Separator, segments) };
 
         if (findings.Count > 0)

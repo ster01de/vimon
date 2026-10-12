@@ -35,6 +35,7 @@ LibreHardwareMonitor needs driver access for many sensors. Without admin rights 
 | PCIe generation and lane width | `nvidia-smi` (NVIDIA only), matched to GPUs by model name |
 | RAM | `GlobalMemoryStatusEx` |
 | Storage temperature | LibreHardwareMonitor |
+| Disk throughput | LibreHardwareMonitor storage sensors *Read Rate* and *Write Rate* |
 | Free disk space | .NET `DriveInfo` (fixed and removable drives), read every 5 s |
 | Network throughput | `NetworkInterface.GetIPStatistics` (64-bit counters). Left out: loopback, tunnels and virtual adapters (Hyper-V, VMware, VirtualBox, WireGuard, TAP, Bluetooth) |
 

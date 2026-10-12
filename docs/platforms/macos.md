@@ -55,7 +55,7 @@ The live view runs in the terminal's alternate screen, like `top`: resizing does
 ```bash
 brew install --cask kitty
 /Applications/kitty.app/Contents/MacOS/kitten panel --detach \
-  --edge=none --columns=31 --lines=9 \
+  --edge=none --columns=31 --lines=10 \
   --margin-left=20 --margin-top=40 \
   --layer=bottom -o background_opacity=0.25 \
   /usr/local/bin/vimon --widget --theme high-contrast
@@ -64,7 +64,7 @@ brew install --cask kitty
 - `--edge=none` anchors the panel at the top-left corner; move it with `--margin-left` and `--margin-top` (pixels).
 - `--layer=bottom` keeps it behind your windows like a desktop widget; `--layer=top` keeps it above them.
 - `background_opacity` goes from `0` (fully transparent) to `1`.
-- `--lines=9` fits status, two findings, CPU, GPU, RAM, network, pressure and thermal state.
+- `--lines=10` fits status, two findings, CPU, GPU, RAM, network, disk, pressure and thermal state.
 
 The panel takes no keyboard input. Stop it with `pkill -f "vimon --widget"`. Starting it automatically at login is not built in yet.
 
@@ -84,6 +84,7 @@ Everything is read through public system interfaces plus read-only SMC access:
 | RAM used | Mach VM statistics, counted like Activity Monitor (app + wired + compressed) |
 | Memory pressure | `sysctl kern.memorystatus_vm_pressure_level` |
 | Thermal state | `NSProcessInfo.thermalState`, the signal macOS uses for throttling |
+| Disk throughput | `Statistics` of every `IOBlockStorageDriver` in the IORegistry (bytes read and written), no root needed. Name and attachment (USB, internal) come from the device's *Device* and *Protocol Characteristics*. Disk images are left out, their bytes also pass the drive that holds them. |
 | Free disk space | `statfs` via .NET `DriveInfo`, read every 5 s: the startup disk and everything under `/Volumes`, without the hidden APFS system volumes that share the startup disk's space. Finder adds purgeable space and may show more. |
 | Busiest processes | `libproc` (`proc_pidinfo` with `PROC_PIDTASKALLINFO`), read every 2 s. CPU is the share of the whole Mac, like the CPU load row; Activity Monitor shows per-core values instead (100 % = one core). Memory is the resident size, which can differ from Activity Monitor's *Memory* column. Only your own processes: macOS refuses the others without root. |
 | Network throughput | Interface byte counters of the routing table (`sysctl NET_RT_IFLIST2`). macOS gives apps only the low 32 bits, rounded to 1 KB; vimon bridges the wrap every 4 GB. Left out: loopback, VPN tunnels (`utun`), AirDrop and peer-to-peer Wi-Fi (`awdl`, `llw`), Personal Hotspot (`ap`), internal bridges (`anpi`, `bridge`) |

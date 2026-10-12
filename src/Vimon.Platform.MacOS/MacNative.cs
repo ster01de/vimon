@@ -20,6 +20,7 @@ internal static class MacNative
 
     public const uint CFStringEncodingUtf8 = 0x08000100;
     public const int CFNumberDoubleType = 13;
+    public const int CFNumberSInt64Type = 4;
 
     // libSystem: sysctl and Mach host statistics
 
@@ -70,6 +71,10 @@ internal static class MacNative
 
     [DllImport(IOKit)]
     public static extern int IORegistryEntryGetParentEntry(uint entry, string plane, out uint parent);
+
+    /// <summary>A system-wide ID that stays the same while the entry exists.</summary>
+    [DllImport(IOKit)]
+    public static extern int IORegistryEntryGetRegistryEntryID(uint entry, out ulong entryId);
 
     [DllImport(IOKit)]
     public static extern IntPtr IORegistryEntryCreateCFProperty(uint entry, IntPtr key, IntPtr allocator, uint options);
@@ -125,6 +130,10 @@ internal static class MacNative
     [DllImport(CoreFoundation)]
     [return: MarshalAs(UnmanagedType.U1)]
     public static extern bool CFNumberGetValue(IntPtr number, int type, out double value);
+
+    [DllImport(CoreFoundation)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static extern bool CFNumberGetValue(IntPtr number, int type, out long value);
 
     [DllImport(CoreFoundation)]
     [return: MarshalAs(UnmanagedType.U1)]

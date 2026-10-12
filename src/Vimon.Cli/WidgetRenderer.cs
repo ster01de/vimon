@@ -17,6 +17,7 @@ internal sealed record WidgetOptions(int Width, string? Timestamp = null, Theme?
 /// CPU   47°C  33%  ▂▃▅▆▇▆▅▄▃▂
 /// RAM         81%  ████████░░
 /// NET ↓1.2M ↑310K  ▁▁▂▅█▆▃▁▁▁
+/// DISK R12M W110M  ▃▅▇██▇▆▅▃▂
 /// </code>
 /// Only foreground colours are used, so a transparent terminal background shows through, and
 /// missing values are left out. Pure: builds a renderable and never writes.
@@ -40,9 +41,6 @@ internal static class WidgetRenderer
     private const int MetricWithSparkWidth = MetricWidth + SparkGap + SparkLength;
     // ShortThroughput never needs more than four characters ("999K", "1.2M").
     private const int ThroughputWidth = 4;
-    // "NET ↓1.2M ↑310K" is as wide as a metric row, so the sparklines line up.
-    private const int NetworkWidth = LabelWidth + (1 + ThroughputWidth) + 1 + (1 + ThroughputWidth);
-    private const int NetworkWithSparkWidth = NetworkWidth + SparkGap + SparkLength;
 
     public static IRenderable Build(
         SystemSnapshot s,
@@ -65,7 +63,10 @@ internal static class WidgetRenderer
             AddIfPresent(lines, MetricLine("GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, hasSpark, theme));
 
         lines.Add(MemoryLine(s.Memory, t, hasSpark, theme));
-        AddIfPresent(lines, NetworkLine(s.Network, history.NetDownBps, options.Width >= NetworkWithSparkWidth, theme));
+        var (down, up) = NetworkTotals.Of(s.Network);
+        AddIfPresent(lines, ThroughputLine("NET", ("↓", down), ("↑", up), history.NetDownBps, options.Width, theme));
+        var (read, write) = DiskTotals.Of(s.Storage);
+        AddIfPresent(lines, ThroughputLine("DISK", ("R", read), ("W", write), history.DiskWriteBps, options.Width, theme));
 
         if (s.Memory.Pressure is MemoryPressure pressure)
             lines.Add(StateLine("Pressure", pressure.ToString(), theme.Of(HealthStyle.LevelOf(pressure)), options.Width, theme));
@@ -146,22 +147,28 @@ internal static class WidgetRenderer
         return $"{"RAM",-LabelWidth} {new string(' ', TempWidth)} [{color}]{load,LoadWidth}[/]{bar}";
     }
 
+    /// <summary><c>NET ↓1.2M ↑310K</c> or <c>DISK R12M W110M</c>, with a sparkline of <paramref name="history"/>.</summary>
     /// <returns>Null until a rate is known, so the row only appears once there is something to show.</returns>
-    private static string? NetworkLine(
-        IReadOnlyList<InterfaceRate> network, IReadOnlyList<double> downHistory, bool hasSpark, Theme theme)
+    private static string? ThroughputLine(
+        string label,
+        (string Mark, double? BytesPerSec) first,
+        (string Mark, double? BytesPerSec) second,
+        IReadOnlyList<double> history,
+        int width,
+        Theme theme)
     {
-        var (down, up) = NetworkTotals.Of(network);
-        string? downText = MetricFormat.ShortThroughput(down);
-        string? upText = MetricFormat.ShortThroughput(up);
+        string? firstText = MetricFormat.ShortThroughput(first.BytesPerSec);
+        string? secondText = MetricFormat.ShortThroughput(second.BytesPerSec);
 
-        if (downText is null && upText is null)
+        if (firstText is null && secondText is null)
             return null;
 
-        string spark = hasSpark && downText is not null
-            ? Spark(Sparkline.ForThroughput(downHistory.TakeLast(SparkLength).ToList()), theme)
-            : "";
+        // At least one space after the label: "DISK" fills the four-wide label column on its own.
+        string values = $"{(label + " ").PadRight(LabelWidth)}{first.Mark}{firstText ?? "",-ThroughputWidth} " +
+                        $"{second.Mark}{secondText ?? "",-ThroughputWidth}";
+        bool hasSpark = history.Count > 0 && width >= values.Length + SparkGap + SparkLength;
 
-        return $"{"NET",-LabelWidth}↓{downText ?? "",-ThroughputWidth} ↑{upText ?? "",-ThroughputWidth}{spark}";
+        return hasSpark ? values + Spark(Sparkline.ForThroughput(history.TakeLast(SparkLength).ToList()), theme) : values;
     }
 
     private static string StateLine(string label, string state, string color, int width, Theme theme)

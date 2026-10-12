@@ -101,6 +101,7 @@ Not available yet: the Linux backend is planned.
 | RAM used | ✓ | ✓ |
 | OS memory pressure | — | ✓ |
 | Free disk space per volume | ✓ | ✓ |
+| Disk throughput per drive (read, write) | ✓ ¹ | ✓ |
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 | Busiest processes (CPU, memory) | planned | ✓ ⁶ |
@@ -167,7 +168,7 @@ The live view uses the terminal's alternate screen where the terminal supports i
 For small terminal panes, tmux and status bars. The first word is the overall status, missing values are left out, and a second line appears only when something needs attention:
 
 ```text
-WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K
+WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K │ DISK R12M W110M
   OS memory pressure elevated
 ```
 
@@ -199,6 +200,7 @@ CPU   42°C  23%  ▄▅▅▅▅▄▃▄▅▆
 GPU   38°C   7%  ▄▆▅▇▂▅▃▂▃▄
 RAM         80%  ████████░░
 NET ↓1.2M ↑310K  ▁▁▂▅█▆▃▁▁▁
+DISK R12M  W110M  ▃▅▇██▇▆▅▃▂
 Pressure  Normal
 Thermal   Nominal
 ```
@@ -272,7 +274,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
 - [ ] Busiest processes on Windows
-- [ ] Disk throughput
+- [ ] USB link speed of external drives, busiest disk process
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
 - [ ] AI section: local inference servers, loaded model, tokens per second

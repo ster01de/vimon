@@ -14,24 +14,74 @@ internal static class DiskPanel
     private const int MaxDrives = 3;
     private const int BarWidth = 10;
     private const int NameWidth = 18;
+    private const int RateWidth = 10;
 
     /// <returns>Label/value rows; a null value is a missing reading.</returns>
-    public static List<(string Label, string? Value)> Rows(SystemSnapshot s, HealthThresholds t, Theme theme)
+    public static List<(string Label, string? Value)> Rows(SystemSnapshot s, MetricHistory h, HealthThresholds t, Theme theme)
     {
+        var rows = new List<(string Label, string? Value)>();
+        var (read, write) = DiskTotals.Of(s.Storage);
+
+        if (read is not null || write is not null)
+        {
+            rows.Add(("Read", Rate(read, h.DiskReadBps, theme)));
+            rows.Add(("Write", Rate(write, h.DiskWriteBps, theme)));
+        }
+
         // The startup disk first, then the others by name, so rows keep their place.
-        var rows = s.Volumes
+        rows.AddRange(s.Volumes
             .OrderBy(v => v.Name != VolumeFilter.StartupDiskName)
             .ThenBy(v => v.Name, StringComparer.Ordinal)
             .Take(MaxVolumes)
-            .Select(v => (MetricFormat.Truncate(v.Name, NameWidth), (string?)Fill(v, t, theme)))
-            .ToList();
+            .Select(v => (MetricFormat.Truncate(v.Name, NameWidth), (string?)Fill(v, t, theme))));
 
+        // Busiest first; the name breaks ties so rows do not swap places while drives are idle.
         rows.AddRange(s.Storage
+            .OrderByDescending(d => (d.ReadBytesPerSec ?? 0) + (d.WriteBytesPerSec ?? 0))
+            .ThenBy(d => d.Name, StringComparer.Ordinal)
             .Take(MaxDrives)
-            .Select(drive => (MetricFormat.Truncate(drive.Name, NameWidth), Temperature(drive.TempC))));
+            .Select(drive => (MetricFormat.Truncate(drive.Name, NameWidth), Drive(drive, theme))));
 
         return rows;
     }
+
+    private static string? Rate(double? bytesPerSec, IReadOnlyList<double> history, Theme theme)
+    {
+        if (MetricFormat.Throughput(bytesPerSec) is not string text)
+            return null;
+
+        string blocks = Sparkline.ForThroughput(history);
+        return blocks.Length == 0 ? text : $"{text,-RateWidth} [{theme.Accent}]{blocks}[/]";
+    }
+
+    /// <returns>Rates, attachment and temperature of one drive, or null when none is known.</returns>
+    private static string? Drive(StorageMetrics drive, Theme theme)
+    {
+        var parts = new List<string>();
+
+        if (drive.ReadBytesPerSec is not null || drive.WriteBytesPerSec is not null)
+        {
+            parts.Add($"R {MetricFormat.Throughput(drive.ReadBytesPerSec) ?? Dashboard.Missing}  " +
+                      $"W {MetricFormat.Throughput(drive.WriteBytesPerSec) ?? Dashboard.Missing}");
+        }
+
+        if (Attachment(drive) is string attachment)
+            parts.Add($"[{theme.Muted}]{Markup.Escape(attachment)}[/]");
+
+        if (Temperature(drive.TempC) is string temperature)
+            parts.Add(temperature);
+
+        return parts.Count == 0 ? null : string.Join(" · ", parts);
+    }
+
+    private static string? Attachment(StorageMetrics drive) => (drive.Interconnect, drive.IsExternal) switch
+    {
+        (null, null) => null,
+        (string link, true) => $"{link} external",
+        (string link, _) => link,
+        (null, true) => "external",
+        _ => "internal"
+    };
 
     private static string Fill(VolumeSpace volume, HealthThresholds t, Theme theme)
     {

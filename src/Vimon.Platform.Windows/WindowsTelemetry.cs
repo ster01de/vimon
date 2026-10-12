@@ -113,7 +113,12 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
             .Where(h => h.HardwareType == HardwareType.Storage)
             .Select(h => new StorageMetrics(
                 h.Name,
-                FindAnyPositive(h, SensorType.Temperature)))
+                FindAnyPositive(h, SensorType.Temperature))
+            {
+                // LibreHardwareMonitor reports these as bytes per second.
+                ReadBytesPerSec = FindNamed(h, SensorType.Throughput, false, "Read Rate"),
+                WriteBytesPerSec = FindNamed(h, SensorType.Throughput, false, "Write Rate")
+            })
             .ToList();
 
         return new SystemSnapshot(

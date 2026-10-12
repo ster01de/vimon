@@ -40,7 +40,7 @@ internal static class Dashboard
                 MemoryPanel(s, t, theme),
                 ProcessesSection(s, options, theme),
                 NetworkPanel(s, history, options, theme),
-                DiskSection(s, options, t, theme)
+                DiskSection(s, history, options, t, theme)
             }
             .OfType<IRenderable>()
             .ToList();
@@ -172,9 +172,9 @@ internal static class Dashboard
     }
 
     /// <returns>Null when hiding missing values and there is neither a volume nor a drive temperature.</returns>
-    private static Panel? DiskSection(SystemSnapshot s, DashboardOptions o, HealthThresholds t, Theme theme)
+    private static Panel? DiskSection(SystemSnapshot s, MetricHistory h, DashboardOptions o, HealthThresholds t, Theme theme)
     {
-        var rows = DiskPanel.Rows(s, t, theme);
+        var rows = DiskPanel.Rows(s, h, t, theme);
 
         if (rows.Count == 0)
             rows.Add(("Volumes", null));

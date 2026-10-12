@@ -10,16 +10,19 @@ internal sealed record MetricHistory(
     ImmutableArray<double> GpuTempC,
     ImmutableArray<double> GpuLoadPct,
     ImmutableArray<double> NetDownBps,
-    ImmutableArray<double> NetUpBps)
+    ImmutableArray<double> NetUpBps,
+    ImmutableArray<double> DiskReadBps,
+    ImmutableArray<double> DiskWriteBps)
 {
     /// <summary>20 samples at the 0.5 s refresh interval: the last 10 seconds.</summary>
     public const int Capacity = 20;
 
-    public static readonly MetricHistory Empty = new([], [], [], [], [], []);
+    public static readonly MetricHistory Empty = new([], [], [], [], [], [], [], []);
 
     public MetricHistory Append(SystemSnapshot snapshot, GpuMetrics? gpu)
     {
         var (down, up) = NetworkTotals.Of(snapshot.Network);
+        var (read, write) = DiskTotals.Of(snapshot.Storage);
 
         return new(
             Push(CpuTempC, snapshot.Cpu?.TempC),
@@ -27,7 +30,9 @@ internal sealed record MetricHistory(
             Push(GpuTempC, gpu?.CoreTempC),
             Push(GpuLoadPct, gpu?.UtilizationPct),
             Push(NetDownBps, down),
-            Push(NetUpBps, up));
+            Push(NetUpBps, up),
+            Push(DiskReadBps, read),
+            Push(DiskWriteBps, write));
     }
 
     /// <summary>Used when the focused GPU changes, so its curves never mix two devices.</summary>
