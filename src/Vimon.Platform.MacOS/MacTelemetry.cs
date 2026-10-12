@@ -15,6 +15,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
     private readonly MacThermalState _thermal;
     private readonly MacTemperatures? _temperatures;
     private readonly MacNetwork _network = new();
+    private readonly MacProcesses _processes = new();
     private CpuLoadInfo? _previousCpuTicks;
     private double? _lastCpuLoadPct;
 
@@ -45,7 +46,9 @@ public sealed class MacTelemetry : IPlatformTelemetry
             [])
         {
             Thermal = _thermal.Read(),
-            Network = _network.Read()
+            Network = _network.Read(),
+            TopProcesses = _processes.Read(),
+            ProcessScope = ProcessScope.CurrentUser
         };
     }
 

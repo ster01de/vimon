@@ -30,6 +30,17 @@ internal static class MacNative
     [DllImport(LibSystem, SetLastError = true)]
     public static extern int sysctl(int[] name, uint namelen, byte[]? oldp, ref nuint oldlenp, IntPtr newp, nuint newlen);
 
+    /// <returns>The number of pids written, or the number of processes when <paramref name="buffer"/> is null.</returns>
+    [DllImport(LibSystem, SetLastError = true)]
+    public static extern int proc_listallpids(int[]? buffer, int bufferBytes);
+
+    /// <returns>The number of bytes written; 0 for processes of other users (EPERM).</returns>
+    [DllImport(LibSystem, SetLastError = true)]
+    public static extern int proc_pidinfo(int pid, int flavor, ulong arg, byte[] buffer, int bufferBytes);
+
+    [DllImport(LibSystem)]
+    public static extern int mach_timebase_info(out MachTimebaseInfo info);
+
     [DllImport(LibSystem)]
     public static extern uint mach_host_self();
 
@@ -183,6 +194,14 @@ internal struct VmStatistics64
     public uint ExternalPageCount;
     public uint InternalPageCount;
     public ulong TotalUncompressedPagesInCompressor;
+}
+
+/// <summary>mach_timebase_info_data_t: nanoseconds = Mach ticks * Numer / Denom (125/3 on Apple Silicon).</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct MachTimebaseInfo
+{
+    public uint Numer;
+    public uint Denom;
 }
 
 /// <summary>xsw_usage from &lt;sys/sysctl.h&gt; (vm.swapusage).</summary>

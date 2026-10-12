@@ -59,6 +59,11 @@ public sealed record SystemSnapshot(
 
     /// <summary>Physical network interfaces; empty where the backend does not read them yet.</summary>
     public IReadOnlyList<InterfaceRate> Network { get; init; } = [];
+
+    /// <summary>The busiest processes the backend can see, busiest first; see <see cref="ProcessScope"/>.</summary>
+    public IReadOnlyList<ProcessUsage> TopProcesses { get; init; } = [];
+
+    public ProcessScope ProcessScope { get; init; } = ProcessScope.None;
 }
 
 /// <summary>Bytes per second of one interface; null until two samples exist or after a counter reset.</summary>
