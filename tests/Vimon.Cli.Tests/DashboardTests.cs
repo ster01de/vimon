@@ -18,7 +18,7 @@ public class DashboardTests
             null, null, null, null);
 
     private static string Render(
-        SystemSnapshot snapshot, int width = 80, bool hideMissing = false, MetricHistory? history = null)
+        SystemSnapshot snapshot, int width = 80, bool hideMissing = false, MetricHistory? history = null, Theme? theme = null)
     {
         var console = new TestConsole();
         console.Profile.Width = width;
@@ -28,7 +28,7 @@ public class DashboardTests
             DiagnosticsEngine.Evaluate(snapshot),
             selectedGpu: 0,
             history ?? MetricHistory.Empty,
-            new DashboardOptions(width, hideMissing)));
+            new DashboardOptions(width, hideMissing, Theme: theme)));
 
         return console.Output;
     }
@@ -54,6 +54,23 @@ public class DashboardTests
         string output = Render(Snapshot(new CpuMetrics("Hot CPU", 95, 10, null, null)));
 
         Assert.Contains("CPU 95°C", output);
+    }
+
+    [Fact]
+    public void NamesTheWorstLevelInTheStatusHeader()
+    {
+        string output = Render(Snapshot(new CpuMetrics("Hot CPU", 95, 10, null, null)));
+
+        Assert.Contains("STATUS · CRIT", output);
+    }
+
+    [Fact]
+    public void MarksFindingsWithTokensInTheMonoTheme()
+    {
+        string output = Render(Snapshot(new CpuMetrics("Hot CPU", 95, 10, null, null)), theme: Theme.Mono);
+
+        Assert.Contains("CRIT CPU 95°C", LineWith(output, "CPU 95°C"));
+        Assert.DoesNotContain("●", output);
     }
 
     [Fact]

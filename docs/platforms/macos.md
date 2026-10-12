@@ -42,6 +42,7 @@ vimon --once            # one frame, then exit
 vimon --compact         # one- or two-line view (toggle with C)
 vimon --once --compact  # single status line, e.g. for tmux or SketchyBar
 vimon --widget          # borderless list for a desktop panel (see below)
+vimon --theme mono      # no colours; also chosen automatically when NO_COLOR is set
 ```
 
 The live view runs in the terminal's alternate screen, like `top`: resizing does not leave copies in the scrollback, and your previous terminal content returns when you quit with `Q`, `Esc` or `Ctrl+C`. Give the window at least ~40 rows to see everything; shorter windows are cut from the bottom, STATUS stays on top.
@@ -56,7 +57,7 @@ brew install --cask kitty
   --edge=none --columns=31 --lines=9 \
   --margin-left=20 --margin-top=40 \
   --layer=bottom -o background_opacity=0.25 \
-  /usr/local/bin/vimon --widget
+  /usr/local/bin/vimon --widget --theme high-contrast
 ```
 
 - `--edge=none` anchors the panel at the top-left corner; move it with `--margin-left` and `--margin-top` (pixels).

@@ -6,7 +6,8 @@ namespace Vimon.Cli;
 
 /// <param name="Width">Every line stays within this many columns.</param>
 /// <param name="Timestamp">Shown at the right of the status line as a sign of life; null for one-shot output.</param>
-internal sealed record WidgetOptions(int Width, string? Timestamp = null);
+/// <param name="Theme">Colours of the widget; null means the default theme.</param>
+internal sealed record WidgetOptions(int Width, string? Timestamp = null, Theme? Theme = null);
 
 /// <summary>
 /// Borderless, read-only view for desktop panels such as kitty's <c>kitten panel</c>:
@@ -50,55 +51,58 @@ internal static class WidgetRenderer
         HealthThresholds? thresholds = null)
     {
         var t = thresholds ?? HealthThresholds.Default;
+        var theme = options.Theme ?? Theme.Default;
         bool hasSpark = options.Width >= MetricWithSparkWidth;
 
-        var lines = new List<string> { StatusLine(diagnostics, options) };
-        lines.AddRange(FindingLines(diagnostics, options.Width));
-        AddIfPresent(lines, MetricLine("CPU", s.Cpu?.TempC, t.CpuTempC, s.Cpu?.LoadPct, history.CpuLoadPct, hasSpark));
+        var lines = new List<string> { StatusLine(diagnostics, options, theme) };
+        lines.AddRange(FindingLines(diagnostics, options.Width, theme));
+        AddIfPresent(lines, MetricLine("CPU", s.Cpu?.TempC, t.CpuTempC, s.Cpu?.LoadPct, history.CpuLoadPct, hasSpark, theme));
 
         if (gpu is not null)
-            AddIfPresent(lines, MetricLine("GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, hasSpark));
+            AddIfPresent(lines, MetricLine("GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, hasSpark, theme));
 
-        lines.Add(MemoryLine(s.Memory, t, hasSpark));
-        AddIfPresent(lines, NetworkLine(s.Network, history.NetDownBps, options.Width >= NetworkWithSparkWidth));
+        lines.Add(MemoryLine(s.Memory, t, hasSpark, theme));
+        AddIfPresent(lines, NetworkLine(s.Network, history.NetDownBps, options.Width >= NetworkWithSparkWidth, theme));
 
         if (s.Memory.Pressure is MemoryPressure pressure)
-            lines.Add(StateLine("Pressure", pressure.ToString(), HealthStyle.PressureColor(pressure), options.Width));
+            lines.Add(StateLine("Pressure", pressure.ToString(), theme.Of(HealthStyle.LevelOf(pressure)), options.Width, theme));
 
         if (s.Thermal is ThermalState thermal)
-            lines.Add(StateLine("Thermal", thermal.ToString(), HealthStyle.ThermalColor(thermal), options.Width));
+            lines.Add(StateLine("Thermal", thermal.ToString(), theme.Of(HealthStyle.LevelOf(thermal)), options.Width, theme));
 
         return new Rows(lines.Select(line => new Markup(line)));
     }
 
-    private static string StatusLine(IReadOnlyList<Diagnostic> diagnostics, WidgetOptions options)
+    private static string StatusLine(IReadOnlyList<Diagnostic> diagnostics, WidgetOptions options, Theme theme)
     {
         var worst = HealthStyle.Worst(diagnostics);
         string token = HealthStyle.Token(worst);
-        string status = $"[{HealthStyle.ColorName(worst)}]{token}[/]";
+        string status = $"[{theme.Of(worst)}]{token}[/]";
 
         if (options.Timestamp is not string time || token.Length + 1 + time.Length > options.Width)
             return status;
 
         string gap = new(' ', options.Width - token.Length - time.Length);
-        return $"{status}{gap}[grey]{Markup.Escape(time)}[/]";
+        return $"{status}{gap}[{theme.Muted}]{Markup.Escape(time)}[/]";
     }
 
     // Worst first; OrderByDescending is stable, so equal levels keep the engine's order.
-    private static IEnumerable<string> FindingLines(IReadOnlyList<Diagnostic> diagnostics, int width) =>
+    private static IEnumerable<string> FindingLines(IReadOnlyList<Diagnostic> diagnostics, int width, Theme theme) =>
         diagnostics
             .Where(d => d.Level != HealthLevel.Good)
             .OrderByDescending(d => d.Level)
             .Take(MaxFindings)
             .Select(d =>
             {
-                string message = MetricFormat.Truncate(d.Message, width - FindingIndent.Length);
-                return $"{FindingIndent}[{HealthStyle.ColorName(d.Level)}]{Markup.Escape(message)}[/]";
+                // Without colour, a token tells warnings and critical findings apart.
+                string prefix = theme.MarksFindings ? HealthStyle.PaddedToken(d.Level) + " " : FindingIndent;
+                string message = MetricFormat.Truncate(d.Message, width - prefix.Length);
+                return $"[{theme.Of(d.Level)}]{prefix}{Markup.Escape(message)}[/]";
             });
 
     /// <returns>Null when neither temperature nor load is known, so the row disappears.</returns>
     private static string? MetricLine(
-        string label, double? tempC, Threshold threshold, double? loadPct, IReadOnlyList<double> loadHistory, bool hasSpark)
+        string label, double? tempC, Threshold threshold, double? loadPct, IReadOnlyList<double> loadHistory, bool hasSpark, Theme theme)
     {
         string? temp = MetricFormat.ShortTemperature(tempC);
         string? load = MetricFormat.ShortPercent(loadPct);
@@ -108,25 +112,26 @@ internal static class WidgetRenderer
 
         string tempCell = temp is null
             ? new string(' ', TempWidth)
-            : $"[{HealthStyle.ColorName(threshold.Classify(tempC!.Value))}]{temp,TempWidth}[/]";
+            : $"[{theme.Of(threshold.Classify(tempC!.Value))}]{temp,TempWidth}[/]";
         string spark = hasSpark && load is not null
-            ? Spark(Sparkline.ForLoad(loadHistory.TakeLast(SparkLength).ToList()))
+            ? Spark(Sparkline.ForLoad(loadHistory.TakeLast(SparkLength).ToList()), theme)
             : "";
 
         return $"{label,-LabelWidth} {tempCell} {load ?? "",LoadWidth}{spark}";
     }
 
-    private static string MemoryLine(MemoryMetrics m, HealthThresholds t, bool hasBar)
+    private static string MemoryLine(MemoryMetrics m, HealthThresholds t, bool hasBar, Theme theme)
     {
-        string color = HealthStyle.ColorName(t.RamLoadPct.Classify(m.LoadPct));
+        string color = theme.Of(t.RamLoadPct.Classify(m.LoadPct));
         string load = MetricFormat.ShortPercent(m.LoadPct) ?? "";
-        string bar = hasBar ? new string(' ', SparkGap) + Bar(m.LoadPct, color) : "";
+        string bar = hasBar ? new string(' ', SparkGap) + Bar(m.LoadPct, color, theme) : "";
 
         return $"{"RAM",-LabelWidth} {new string(' ', TempWidth)} [{color}]{load,LoadWidth}[/]{bar}";
     }
 
     /// <returns>Null until a rate is known, so the row only appears once there is something to show.</returns>
-    private static string? NetworkLine(IReadOnlyList<InterfaceRate> network, IReadOnlyList<double> downHistory, bool hasSpark)
+    private static string? NetworkLine(
+        IReadOnlyList<InterfaceRate> network, IReadOnlyList<double> downHistory, bool hasSpark, Theme theme)
     {
         var (down, up) = NetworkTotals.Of(network);
         string? downText = MetricFormat.ShortThroughput(down);
@@ -136,25 +141,25 @@ internal static class WidgetRenderer
             return null;
 
         string spark = hasSpark && downText is not null
-            ? Spark(Sparkline.ForThroughput(downHistory.TakeLast(SparkLength).ToList()))
+            ? Spark(Sparkline.ForThroughput(downHistory.TakeLast(SparkLength).ToList()), theme)
             : "";
 
         return $"{"NET",-LabelWidth}↓{downText ?? "",-ThroughputWidth} ↑{upText ?? "",-ThroughputWidth}{spark}";
     }
 
-    private static string StateLine(string label, string state, string color, int width)
+    private static string StateLine(string label, string state, string color, int width, Theme theme)
     {
         string value = MetricFormat.Truncate(state, width - StateLabelWidth);
-        return $"[grey]{label,-StateLabelWidth}[/][{color}]{value}[/]";
+        return $"[{theme.Muted}]{label,-StateLabelWidth}[/][{color}]{value}[/]";
     }
 
-    private static string Spark(string blocks) =>
-        blocks.Length == 0 ? "" : $"{new string(' ', SparkGap)}[steelblue]{blocks}[/]";
+    private static string Spark(string blocks, Theme theme) =>
+        blocks.Length == 0 ? "" : $"{new string(' ', SparkGap)}[{theme.Accent}]{blocks}[/]";
 
-    private static string Bar(double percent, string color)
+    private static string Bar(double percent, string color, Theme theme)
     {
         int filled = MetricFormat.FilledCells(percent, SparkLength);
-        return $"[{color}]{new string('█', filled)}[/][grey]{new string('░', SparkLength - filled)}[/]";
+        return $"[{color}]{new string('█', filled)}[/][{theme.Muted}]{new string('░', SparkLength - filled)}[/]";
     }
 
     private static void AddIfPresent(List<string> lines, string? line)

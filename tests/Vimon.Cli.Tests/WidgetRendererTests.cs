@@ -33,7 +33,8 @@ public class WidgetRendererTests
         int width = WidgetRenderer.MaxWidth,
         MetricHistory? history = null,
         string? timestamp = null,
-        bool ansi = false)
+        bool ansi = false,
+        Theme? theme = null)
     {
         var console = Console(ansi);
         console.Write(WidgetRenderer.Build(
@@ -41,10 +42,18 @@ public class WidgetRendererTests
             snapshot.Gpus.FirstOrDefault(),
             DiagnosticsEngine.Evaluate(snapshot),
             history ?? MetricHistory.Empty,
-            new WidgetOptions(width, timestamp)));
+            new WidgetOptions(width, timestamp, theme)));
 
         return console.Output;
     }
+
+    private static int[] SgrParameters(string output) =>
+        Regex.Matches(output, @"\x1b\[([0-9;]*)m")
+            .SelectMany(m => m.Groups[1].Value.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            .Select(int.Parse)
+            .ToArray();
+
+    public static TheoryData<string> ThemeNames => new(Theme.All.Select(theme => theme.Name).ToArray());
 
     private static string[] Lines(string output) =>
         output.Split('\n')
@@ -80,21 +89,47 @@ public class WidgetRendererTests
             Assert.DoesNotContain(forbidden, output);
     }
 
-    [Fact]
-    public void EmitsNoBackgroundColoursSoTransparencyShowsThrough()
+    [Theory]
+    [MemberData(nameof(ThemeNames))]
+    public void EmitsNoBackgroundColoursSoTransparencyShowsThrough(string themeName)
     {
         var hot = Snapshot(Cpu(tempC: 95, loadPct: 90), Gpu(coreTempC: 84)) with { Thermal = ThermalState.Serious };
         var history = MetricHistory.Empty with { CpuLoadPct = [10, 50, 90] };
 
-        string output = Render(hot, history: history, timestamp: "12:00:00", ansi: true);
+        string output = Render(hot, history: history, timestamp: "12:00:00", ansi: true, theme: Theme.Find(themeName));
 
-        var parameters = Regex.Matches(output, @"\x1b\[([0-9;]*)m")
-            .SelectMany(m => m.Groups[1].Value.Split(';', StringSplitOptions.RemoveEmptyEntries))
-            .Select(int.Parse)
-            .ToList();
-
+        var parameters = SgrParameters(output);
         Assert.NotEmpty(parameters);
         Assert.DoesNotContain(parameters, p => p is >= 40 and <= 49 or >= 100 and <= 107);
+    }
+
+    [Fact]
+    public void MonoMarksCriticalWithBoldInsteadOfColour()
+    {
+        string output = Render(Snapshot(Cpu(tempC: 95, loadPct: 10)), ansi: true, theme: Theme.Mono);
+
+        var parameters = SgrParameters(output);
+        Assert.Contains(1, parameters);
+        Assert.DoesNotContain(parameters, p => p is >= 30 and <= 38 or >= 90 and <= 97);
+    }
+
+    [Fact]
+    public void MonoMarksEachFindingWithItsLevel()
+    {
+        var snapshot = Snapshot(Cpu(tempC: 85, loadPct: 10), Gpu(coreTempC: 90));
+
+        var lines = Lines(Render(snapshot, theme: Theme.Mono));
+
+        Assert.Equal("CRIT Test GPU: GPU 90°C", lines[1]);
+        Assert.StartsWith("WARN CPU 85°C", lines[2]);
+    }
+
+    [Fact]
+    public void HighContrastUsesItsOwnCriticalStyle()
+    {
+        string output = Render(Snapshot(Cpu(tempC: 95, loadPct: 10)), ansi: true, theme: Theme.HighContrast);
+
+        Assert.StartsWith(AnsiPrefix(Theme.HighContrast.Critical) + "CRIT", output);
     }
 
     [Fact]

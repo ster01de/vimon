@@ -1,11 +1,13 @@
-using Spectre.Console;
 using Vimon.Core;
 
 namespace Vimon.Cli;
 
-/// <summary>Colours and short tokens for health levels, shared by every view so they always agree.</summary>
+/// <summary>Health levels and their short tokens, shared by every view; colours come from <see cref="Theme"/>.</summary>
 internal static class HealthStyle
 {
+    // Four columns, so findings line up behind the token in themes without colour.
+    private const int TokenWidth = 4;
+
     public static HealthLevel Worst(IReadOnlyList<Diagnostic> diagnostics) =>
         diagnostics.Count == 0 ? HealthLevel.Good : diagnostics.Max(d => d.Level);
 
@@ -17,33 +19,19 @@ internal static class HealthStyle
         _ => "OK"
     };
 
-    public static string ColorName(HealthLevel level) => level switch
+    public static string PaddedToken(HealthLevel level) => Token(level).PadRight(TokenWidth);
+
+    public static HealthLevel LevelOf(ThermalState state) => state switch
     {
-        HealthLevel.Critical => "red",
-        HealthLevel.Warning => "yellow",
-        HealthLevel.Info => "blue",
-        _ => "green"
+        ThermalState.Critical => HealthLevel.Critical,
+        ThermalState.Serious => HealthLevel.Warning,
+        _ => HealthLevel.Good
     };
 
-    public static Color ColorOf(HealthLevel level) => level switch
+    public static HealthLevel LevelOf(MemoryPressure pressure) => pressure switch
     {
-        HealthLevel.Critical => Color.Red,
-        HealthLevel.Warning => Color.Yellow,
-        HealthLevel.Info => Color.Blue,
-        _ => Color.Green
-    };
-
-    public static string ThermalColor(ThermalState state) => state switch
-    {
-        ThermalState.Critical => "red",
-        ThermalState.Serious => "yellow",
-        _ => "green"
-    };
-
-    public static string PressureColor(MemoryPressure pressure) => pressure switch
-    {
-        MemoryPressure.Critical => "red",
-        MemoryPressure.Warning => "yellow",
-        _ => "green"
+        MemoryPressure.Critical => HealthLevel.Critical,
+        MemoryPressure.Warning => HealthLevel.Warning,
+        _ => HealthLevel.Good
     };
 }

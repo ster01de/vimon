@@ -148,6 +148,7 @@ Options:
 --compact        one- or two-line view (see below)
 --widget         borderless list for transparent desktop panels (see below)
 --hide-missing   start with rows without a value hidden
+--theme <name>   default, mono or high-contrast (see below)
 ```
 
 The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. If the window is too short, the view is cut from the bottom; STATUS always stays visible.
@@ -167,6 +168,16 @@ WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K
 set -g status-right '#(vimon --once --compact | head -1)'
 ```
 
+### Themes and NO_COLOR
+
+| Theme | For |
+|---|---|
+| `default` | dark and light terminals |
+| `high-contrast` | bright colours for dark or transparent backgrounds, e.g. the desktop widget |
+| `mono` | no colours: findings are marked `OK` / `INFO` / `WARN` / `CRIT`, warnings are bold |
+
+Status never depends on colour alone: the STATUS header names the worst level in every theme (`STATUS · WARN`). vimon follows [`NO_COLOR`](https://no-color.org): when it is set, or the terminal has no colours, vimon switches to `mono`. An explicit `--theme` wins over `NO_COLOR`. Output written to a file or pipe (`vimon --once > status.txt`) has no colours either, so it uses the `mono` markers too. `--compact` is plain text in every theme.
+
 ### Widget view
 
 `vimon --widget` drops header, key help and borders and uses no background colours, so it can sit on the desktop in a transparent terminal panel. At most 30 columns wide; sparklines disappear below 27:
@@ -181,7 +192,7 @@ Pressure  Normal
 Thermal   Nominal
 ```
 
-`--widget` wins over `--compact`; in the widget only `Q` and `Esc` react, so a stray key cannot pause or change it. On macOS, [kitty](https://sw.kovidgoyal.net/kitty/)'s panel turns it into a desktop widget: see [Desktop widget with kitty](docs/platforms/macos.md#desktop-widget-with-kitty).
+Add `--theme high-contrast` when the widget sits on a transparent background. `--widget` wins over `--compact`; in the widget only `Q` and `Esc` react, so a stray key cannot pause or change it. On macOS, [kitty](https://sw.kovidgoyal.net/kitty/)'s panel turns it into a desktop widget: see [Desktop widget with kitty](docs/platforms/macos.md#desktop-widget-with-kitty).
 
 ---
 

@@ -46,6 +46,7 @@ Console.OutputEncoding = Encoding.UTF8;
 
 bool hideMissing = cli.HideMissing;
 var mode = cli.Mode;
+var theme = ApplyTheme(cli.Theme);
 
 if (cli.Once)
 {
@@ -153,12 +154,12 @@ IRenderable BuildView()
 
     if (mode == ViewMode.Widget)
         return WidgetRenderer.Build(current, gpu, diagnostics, history,
-            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture)));
+            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture), theme));
 
     if (mode == ViewMode.Compact)
         return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
 
-    var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused);
+    var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused, theme);
     return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
 }
 
@@ -235,14 +236,29 @@ void WriteOnce(SystemSnapshot s)
             break;
         case ViewMode.Widget:
             AnsiConsole.Write(WidgetRenderer.Build(s, gpu, diagnostics, MetricHistory.Empty,
-                new WidgetOptions(Console.IsOutputRedirected ? WidgetRenderer.MaxWidth : GetWidgetWidth())));
+                new WidgetOptions(Console.IsOutputRedirected ? WidgetRenderer.MaxWidth : GetWidgetWidth(), Theme: theme)));
             break;
         default:
             AnsiConsole.Write(Dashboard.Build(
                 s, gpu, diagnostics, 0, MetricHistory.Empty,
-                new DashboardOptions(AnsiConsole.Profile.Width, hideMissing)));
+                new DashboardOptions(AnsiConsole.Profile.Width, hideMissing, Theme: theme)));
             break;
     }
+}
+
+// Spectre has already turned colour off for NO_COLOR, TERM=dumb and redirected output; an explicit
+// --theme switches it back on, but only where the terminal understands ANSI escape codes at all.
+static Theme ApplyTheme(Theme? requested)
+{
+    var capabilities = AnsiConsole.Profile.Capabilities;
+    var (theme, forceColor) = ThemeResolver.Resolve(
+        requested, consoleHasColor: capabilities.ColorSystem != ColorSystem.NoColors, canForceColor: capabilities.Ansi);
+
+    // 16 colours are enough for every theme and work in every ANSI terminal.
+    if (forceColor)
+        capabilities.ColorSystem = ColorSystem.Standard;
+
+    return theme;
 }
 
 static GpuMetrics? GpuAt(SystemSnapshot s, int index) =>
