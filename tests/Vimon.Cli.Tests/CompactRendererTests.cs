@@ -54,6 +54,14 @@ public class CompactRendererTests
     }
 
     [Fact]
+    public void AddsNetworkThroughputWhenKnown()
+    {
+        var lines = Render(Snapshot() with { Network = [new("en0", 1_200_000, 310_000)] });
+
+        Assert.Equal(new[] { $"OK │ CPU 50°C 10% │ RAM 25% │ NET ↓{1.2:0.0}M ↑310K" }, lines);
+    }
+
+    [Fact]
     public void NumbersTheSelectedGpuWhenThereAreSeveral()
     {
         var lines = Render(Snapshot(null, Gpu(60, 30), Gpu(70, 90)), selectedGpu: 1);

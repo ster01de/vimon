@@ -4,7 +4,7 @@ namespace Vimon.Platform.MacOS;
 
 /// <summary>
 /// macOS backend without root: Mach host statistics, sysctl, the IORegistry, NSProcessInfo and
-/// read-only SMC access for temperatures. Power is not reported yet.
+/// read-only SMC access for temperatures, routing-table counters for network throughput. Power is not reported yet.
 /// </summary>
 public sealed class MacTelemetry : IPlatformTelemetry
 {
@@ -14,6 +14,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
     private readonly MacMemory _memory;
     private readonly MacThermalState _thermal;
     private readonly MacTemperatures? _temperatures;
+    private readonly MacNetwork _network = new();
     private CpuLoadInfo? _previousCpuTicks;
     private double? _lastCpuLoadPct;
 
@@ -43,7 +44,8 @@ public sealed class MacTelemetry : IPlatformTelemetry
             _memory.Read(),
             [])
         {
-            Thermal = _thermal.Read()
+            Thermal = _thermal.Read(),
+            Network = _network.Read()
         };
     }
 

@@ -99,8 +99,9 @@ Not available yet: the Linux backend is planned.
 | RAM used | ✓ | ✓ |
 | OS memory pressure | — | ✓ |
 | Storage temperature | ✓ | — |
+| Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 
-¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU
+¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU · ⁵ physical interfaces: loopback, VPN tunnels and known virtual adapters are left out, because their traffic also passes Wi-Fi or Ethernet
 
 Missing values are shown as `—`, never as `0` or `ERROR`. Press `H` to hide them.
 
@@ -156,7 +157,7 @@ The live view uses the terminal's alternate screen where the terminal supports i
 For small terminal panes, tmux and status bars. The first word is the overall status, missing values are left out, and a second line appears only when something needs attention:
 
 ```text
-WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81%
+WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K
   OS memory pressure elevated
 ```
 
@@ -175,6 +176,7 @@ OK                   16:06:15
 CPU   42°C  23%  ▄▅▅▅▅▄▃▄▅▆
 GPU   38°C   7%  ▄▆▅▇▂▅▃▂▃▄
 RAM         80%  ████████░░
+NET ↓1.2M ↑310K  ▁▁▂▅█▆▃▁▁▁
 Pressure  Normal
 Thermal   Nominal
 ```
@@ -245,7 +247,8 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 ### Next
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
-- [ ] Network and disk throughput
+- [x] Network throughput (next release)
+- [ ] Disk throughput
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
 - [ ] AI section: local inference servers, loaded model, tokens per second

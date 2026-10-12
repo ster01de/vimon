@@ -16,6 +16,7 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
     };
 
     private readonly NvidiaPcieProbe _nvidiaPcie = new();
+    private readonly WindowsNetwork _network = new();
 
     public string PlatformName => "Windows";
 
@@ -120,7 +121,10 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
             gpus,
             memory,
             storage
-        );
+        )
+        {
+            Network = _network.Read()
+        };
     }
 
     private static double? FindNamed(

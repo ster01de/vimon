@@ -26,6 +26,10 @@ internal static class MacNative
     [DllImport(LibSystem)]
     public static extern int sysctlbyname(string name, IntPtr oldp, ref nuint oldlenp, IntPtr newp, nuint newlen);
 
+    /// <remarks>A null <paramref name="oldp"/> asks for the size only.</remarks>
+    [DllImport(LibSystem, SetLastError = true)]
+    public static extern int sysctl(int[] name, uint namelen, byte[]? oldp, ref nuint oldlenp, IntPtr newp, nuint newlen);
+
     [DllImport(LibSystem)]
     public static extern uint mach_host_self();
 

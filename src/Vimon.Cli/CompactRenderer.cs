@@ -5,7 +5,7 @@ namespace Vimon.Cli;
 
 /// <summary>
 /// One- or two-line view for small terminals, tmux and status bars:
-/// <c>WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81%</c>, plus a line with the findings when
+/// <c>WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K</c>, plus a line with the findings when
 /// something is not healthy. Missing values are left out instead of shown as dashes. Pure.
 /// </summary>
 internal static class CompactRenderer
@@ -37,6 +37,9 @@ internal static class CompactRenderer
 
         AddSegment(segments, "RAM", MetricFormat.ShortPercent(s.Memory.LoadPct));
 
+        var (down, up) = NetworkTotals.Of(s.Network);
+        AddSegment(segments, "NET", Arrow("↓", down), Arrow("↑", up));
+
         var lines = new List<string> { string.Join(Separator, segments) };
 
         if (findings.Count > 0)
@@ -48,6 +51,9 @@ internal static class CompactRenderer
 
         return b.ToString();
     }
+
+    private static string? Arrow(string arrow, double? bytesPerSec) =>
+        MetricFormat.ShortThroughput(bytesPerSec) is string text ? arrow + text : null;
 
     private static void AddSegment(List<string> segments, string label, params string?[] values)
     {

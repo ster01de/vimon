@@ -138,8 +138,17 @@ public class WidgetRendererTests
     public void KeepsEveryLineWithinTheWidth()
     {
         var snapshot = Snapshot(Cpu(tempC: 95, loadPct: 10), Gpu(coreTempC: 90))
-            with { Thermal = ThermalState.Serious, Memory = Memory with { Pressure = MemoryPressure.Warning } };
-        var history = MetricHistory.Empty with { CpuLoadPct = [.. Enumerable.Range(0, 20).Select(i => i * 5.0)] };
+            with
+            {
+                Thermal = ThermalState.Serious,
+                Memory = Memory with { Pressure = MemoryPressure.Warning },
+                Network = [new("en0", 999_000_000, 999_000)]
+            };
+        var history = MetricHistory.Empty with
+        {
+            CpuLoadPct = [.. Enumerable.Range(0, 20).Select(i => i * 5.0)],
+            NetDownBps = [.. Enumerable.Range(0, 20).Select(i => i * 50_000.0)]
+        };
 
         foreach (int width in new[] { WidgetRenderer.MinWidth, 22, WidgetRenderer.MaxWidth })
         {
@@ -205,6 +214,23 @@ public class WidgetRendererTests
         Assert.DoesNotContain("Thermal", Render(Snapshot()));
         Assert.Contains("Pressure  Normal", Render(reported));
         Assert.Contains("Thermal   Nominal", Render(reported));
+    }
+
+    [Fact]
+    public void ShowsNetworkThroughputBelowRam()
+    {
+        var lines = Lines(Render(Snapshot() with { Network = [new("en0", 1_200_000, 310_000)] }));
+
+        int ram = Array.FindIndex(lines, line => line.StartsWith("RAM"));
+        Assert.Equal($"NET ↓{1.2:0.0}M ↑310K", lines[ram + 1]);
+    }
+
+    [Fact]
+    public void LeavesOutTheNetworkRowUntilARateIsKnown()
+    {
+        string output = Render(Snapshot() with { Network = [new("en0", null, null)] });
+
+        Assert.DoesNotContain("NET", output);
     }
 
     [Fact]

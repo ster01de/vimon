@@ -15,6 +15,7 @@ internal sealed record WidgetOptions(int Width, string? Timestamp = null);
 ///   OS memory pressure elevated
 /// CPU   47°C  33%  ▂▃▅▆▇▆▅▄▃▂
 /// RAM         81%  ████████░░
+/// NET ↓1.2M ↑310K  ▁▁▂▅█▆▃▁▁▁
 /// </code>
 /// Only foreground colours are used, so a transparent terminal background shows through, and
 /// missing values are left out. Pure: builds a renderable and never writes.
@@ -34,6 +35,11 @@ internal static class WidgetRenderer
     private const int SparkGap = 2;
     private const int MetricWidth = LabelWidth + 1 + TempWidth + 1 + LoadWidth;
     private const int MetricWithSparkWidth = MetricWidth + SparkGap + SparkLength;
+    // ShortThroughput never needs more than four characters ("999K", "1.2M").
+    private const int ThroughputWidth = 4;
+    // "NET ↓1.2M ↑310K" is as wide as a metric row, so the sparklines line up.
+    private const int NetworkWidth = LabelWidth + (1 + ThroughputWidth) + 1 + (1 + ThroughputWidth);
+    private const int NetworkWithSparkWidth = NetworkWidth + SparkGap + SparkLength;
 
     public static IRenderable Build(
         SystemSnapshot s,
@@ -54,6 +60,7 @@ internal static class WidgetRenderer
             AddIfPresent(lines, MetricLine("GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, hasSpark));
 
         lines.Add(MemoryLine(s.Memory, t, hasSpark));
+        AddIfPresent(lines, NetworkLine(s.Network, history.NetDownBps, options.Width >= NetworkWithSparkWidth));
 
         if (s.Memory.Pressure is MemoryPressure pressure)
             lines.Add(StateLine("Pressure", pressure.ToString(), HealthStyle.PressureColor(pressure), options.Width));
@@ -116,6 +123,23 @@ internal static class WidgetRenderer
         string bar = hasBar ? new string(' ', SparkGap) + Bar(m.LoadPct, color) : "";
 
         return $"{"RAM",-LabelWidth} {new string(' ', TempWidth)} [{color}]{load,LoadWidth}[/]{bar}";
+    }
+
+    /// <returns>Null until a rate is known, so the row only appears once there is something to show.</returns>
+    private static string? NetworkLine(IReadOnlyList<InterfaceRate> network, IReadOnlyList<double> downHistory, bool hasSpark)
+    {
+        var (down, up) = NetworkTotals.Of(network);
+        string? downText = MetricFormat.ShortThroughput(down);
+        string? upText = MetricFormat.ShortThroughput(up);
+
+        if (downText is null && upText is null)
+            return null;
+
+        string spark = hasSpark && downText is not null
+            ? Spark(Sparkline.ForThroughput(downHistory.TakeLast(SparkLength).ToList()))
+            : "";
+
+        return $"{"NET",-LabelWidth}↓{downText ?? "",-ThroughputWidth} ↑{upText ?? "",-ThroughputWidth}{spark}";
     }
 
     private static string StateLine(string label, string state, string color, int width)

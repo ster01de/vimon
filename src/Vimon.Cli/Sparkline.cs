@@ -9,10 +9,14 @@ internal static class Sparkline
     private const double TempMaxC = 130;
     private const double LoadMinSpanPct = 20;
     private const double LoadMaxPct = 100;
+    // 64 KB/s: background chatter on an idle link stays a flat line.
+    private const double ThroughputMinSpanBps = 64_000;
 
     public static string ForTemperature(IReadOnlyList<double> values) => Fitted(values, TempMinSpanC, TempMaxC);
 
     public static string ForLoad(IReadOnlyList<double> values) => Fitted(values, LoadMinSpanPct, LoadMaxPct);
+
+    public static string ForThroughput(IReadOnlyList<double> values) => Fitted(values, ThroughputMinSpanBps, double.MaxValue);
 
     /// <summary>Values outside <paramref name="min"/>..<paramref name="max"/> are clamped to the edges.</summary>
     public static string Render(IReadOnlyList<double> values, double min, double max)

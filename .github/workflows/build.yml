@@ -35,6 +35,7 @@ jobs:
           echo "$output"
           grep -q "Thermal" <<< "$output"
           grep -q "Pressure" <<< "$output"
+          grep -q "NETWORK" <<< "$output"
       - name: Smoke test widget output
         run: |
           output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build -- --once --widget)
