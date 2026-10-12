@@ -7,12 +7,12 @@
 ## Install
 
 ```bash
-curl -fLO https://github.com/ster01de/vimon/releases/download/v0.4.0-alpha/vimon-macos-arm64.tar.gz
+curl -fLO https://github.com/ster01de/vimon/releases/download/v0.5.0-alpha/vimon-macos-arm64.tar.gz
 tar -xzf vimon-macos-arm64.tar.gz
 ./vimon
 ```
 
-For a newer version, replace `v0.4.0-alpha` with the tag from the [releases page](https://github.com/ster01de/vimon/releases).
+For a newer version, replace `v0.5.0-alpha` with the tag from the [releases page](https://github.com/ster01de/vimon/releases).
 
 | Mac | File |
 |---|---|
