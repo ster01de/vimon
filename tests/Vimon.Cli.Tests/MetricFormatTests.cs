@@ -50,6 +50,21 @@ public class MetricFormatTests
     }
 
     [Theory]
+    [InlineData("5 B/s", 8, "   5 B/s")]
+    [InlineData("12 MB/s", 8, " 12 MB/s")]
+    [InlineData("much too long", 8, "much to…")]
+    public void AlignsRightInAFixedWidth(string text, int width, string expected) =>
+        Assert.Equal(expected, MetricFormat.AlignRight(text, width));
+
+    [Theory]
+    [InlineData(999.4)]
+    [InlineData(999_499.0)]
+    [InlineData(9_949_999.0)]
+    [InlineData(999_400_000_000.0)]
+    public void ThroughputFitsItsColumnAtEveryUnitBoundary(double bytesPerSec) =>
+        Assert.True(MetricFormat.Throughput(bytesPerSec)!.Length <= MetricFormat.ThroughputWidth);
+
+    [Theory]
     [InlineData("short", 10, "short")]
     [InlineData("exactly10!", 10, "exactly10!")]
     [InlineData("much too long", 8, "much to…")]

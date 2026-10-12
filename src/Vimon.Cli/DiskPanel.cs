@@ -4,19 +4,27 @@ using Vimon.Core;
 namespace Vimon.Cli;
 
 /// <summary>
-/// Rows of the DISK panel: how full each volume is (coloured with the same limits as the status
-/// check) and drive temperatures where the platform reports them. Pure.
+/// Rows of the DISK panel: total throughput, the process causing most of it, how full each volume is
+/// (coloured with the same limits as the status check) and one row per drive. Rows keep their place:
+/// they exist as soon as there is a drive and every value sits in a column of fixed width. Pure.
 /// </summary>
 internal static class DiskPanel
 {
     public const int MaxVolumes = 3;
 
     private const int MaxDrives = 3;
-    // Sized so a row fits a side-by-side panel at 100 columns without wrapping.
+    // Sized so a row fits a side-by-side panel at 100 columns (45 cells after the 10-cell label) without wrapping.
     private const int BarWidth = 6;
-    private const int NameWidth = 16;
-    private const int RateWidth = 10;
-    private const int ProcessNameWidth = 18;
+    private const int PercentWidth = 5;
+    private const int FreeWidth = 8;
+    private const int RateWidth = MetricFormat.ThroughputWidth;
+    // "R 999 KB/s W 999 KB/s"
+    private const int RateCellsWidth = 2 * (2 + RateWidth) + 1;
+    // "USB 480 Mb/s"
+    private const int TailWidth = 12;
+    private const int ProcessNameWidth = 12;
+    private const string StartupLabel = "Startup";
+    private const string Idle = "idle";
 
     /// <returns>Label/value rows; a null value is a missing reading.</returns>
     public static List<(string Label, string? Value)> Rows(SystemSnapshot s, MetricHistory h, HealthThresholds t, Theme theme)
@@ -24,105 +32,112 @@ internal static class DiskPanel
         var rows = new List<(string Label, string? Value)>();
         var (read, write) = DiskTotals.Of(s.Storage);
 
-        if (read is not null || write is not null)
+        // Present from the first sample on, before there is a rate, so nothing below moves when one arrives.
+        if (s.Storage.Count > 0)
         {
-            rows.Add(("Read", Rate(read, h.DiskReadBps, theme)));
-            rows.Add(("Write", Rate(write, h.DiskWriteBps, theme)));
-        }
+            rows.Add(("Read", Dashboard.Rate(read, h.DiskReadBps, theme)));
+            rows.Add(("Write", Dashboard.Rate(write, h.DiskWriteBps, theme)));
 
-        if (s.TopDiskProcesses.Count > 0)
-            rows.Add(("Busiest", BusiestProcess(s.TopDiskProcesses[0])));
+            if (s.ProcessScope != ProcessScope.None)
+                rows.Add(("Busiest", BusiestProcess(s.TopDiskProcesses, theme)));
+        }
 
         // The startup disk first, then the others by name, so rows keep their place.
         rows.AddRange(s.Volumes
             .OrderBy(v => v.Name != VolumeFilter.StartupDiskName)
             .ThenBy(v => v.Name, StringComparer.Ordinal)
             .Take(MaxVolumes)
-            .Select(v => (MetricFormat.Truncate(v.Name, NameWidth), (string?)Fill(v, t, theme))));
+            .Select(v => (VolumeLabel(v), (string?)Fill(v, t, theme))));
 
-        // Busiest first; the name breaks ties so rows do not swap places while drives are idle.
+        // By name, not by traffic, so drives do not swap places while a copy starts or ends.
         rows.AddRange(s.Storage
-            .OrderByDescending(d => (d.ReadBytesPerSec ?? 0) + (d.WriteBytesPerSec ?? 0))
-            .ThenBy(d => d.Name, StringComparer.Ordinal)
+            .OrderBy(d => d.Name, StringComparer.Ordinal)
             .Take(MaxDrives)
-            .SelectMany(drive => DriveRows(drive, theme)));
+            .Select(drive => (MetricFormat.Truncate(drive.Name, Dashboard.LabelWidth), Drive(drive, theme))));
 
         return rows;
     }
 
-    /// <summary>Which process causes the traffic, e.g. <c>Finder  W 110 MB/s</c>; idle directions are left out.</summary>
-    private static string BusiestProcess(ProcessUsage process)
+    /// <summary>
+    /// Which process causes the traffic, e.g. <c>Finder       R    0 B/s W  110 MB/s</c>; a dash while
+    /// nothing reads or writes, so the row stays.
+    /// </summary>
+    private static string BusiestProcess(IReadOnlyList<ProcessUsage> top, Theme theme)
     {
-        var parts = new List<string> { Markup.Escape(MetricFormat.Truncate(process.Name, ProcessNameWidth)) };
+        var process = top.FirstOrDefault();
 
-        if (process.DiskReadBytesPerSec > 0)
-            parts.Add($"R {MetricFormat.Throughput(process.DiskReadBytesPerSec)}");
+        if (process is null || (process.DiskReadBytesPerSec ?? 0) + (process.DiskWriteBytesPerSec ?? 0) <= 0)
+            return $"[{theme.Muted}]{Dashboard.Missing}[/]";
 
-        if (process.DiskWriteBytesPerSec > 0)
-            parts.Add($"W {MetricFormat.Throughput(process.DiskWriteBytesPerSec)}");
-
-        return string.Join("  ", parts);
+        // Cut before escaping, so an escaped '[' can never be split in half.
+        string name = Markup.Escape(MetricFormat.Truncate(process.Name, ProcessNameWidth).PadRight(ProcessNameWidth));
+        return $"{name} {RateCells(process.DiskReadBytesPerSec, process.DiskWriteBytesPerSec, theme)}";
     }
 
-    /// <summary>The drive row, plus a row with its USB link below, so neither gets too long for a side-by-side panel.</summary>
-    private static IEnumerable<(string Label, string? Value)> DriveRows(StorageMetrics drive, Theme theme)
+    /// <returns>Rates and attachment of one drive in fixed columns, or null when neither is known.</returns>
+    private static string? Drive(StorageMetrics drive, Theme theme)
     {
-        yield return (MetricFormat.Truncate(drive.Name, NameWidth), Drive(drive, theme));
+        string? tail = Tail(drive, theme);
 
+        if (drive.ReadBytesPerSec is null && drive.WriteBytesPerSec is null && tail is null)
+            return null;
+
+        return tail is null
+            ? RateCells(drive.ReadBytesPerSec, drive.WriteBytesPerSec, theme)
+            : $"{RateCells(drive.ReadBytesPerSec, drive.WriteBytesPerSec, theme)} {tail}";
+    }
+
+    /// <summary><c>R  556 KB/s W 7.8 KB/s</c> in <see cref="RateCellsWidth"/> cells; a quiet <c>idle</c> without traffic.</summary>
+    internal static string RateCells(double? read, double? write, Theme theme)
+    {
+        if (read is null && write is null)
+            return $"[{theme.Muted}]{Dashboard.Missing.PadRight(RateCellsWidth)}[/]";
+
+        if (read == 0 && write == 0)
+            return $"[{theme.Muted}]{Idle.PadRight(RateCellsWidth)}[/]";
+
+        return $"R {Cell(read)} W {Cell(write)}";
+    }
+
+    private static string Cell(double? bytesPerSec) =>
+        MetricFormat.AlignRight(MetricFormat.Throughput(bytesPerSec) ?? Dashboard.Missing, RateWidth);
+
+    /// <summary>
+    /// How the drive is attached, in at most <see cref="TailWidth"/> cells: the USB link speed (the
+    /// limit that matters for a copy), otherwise external/internal, or the temperature of an internal drive.
+    /// </summary>
+    private static string? Tail(StorageMetrics drive, Theme theme)
+    {
         if (drive.UsbLink is UsbSpeed link)
         {
             string color = UsbSpeeds.IsSlow(link) ? theme.Info : theme.Muted;
-            yield return ("", $"[{color}]{theme.Glyphs.Branch} {UsbSpeeds.Describe(link)}[/]");
+            return $"[{color}]USB {UsbSpeeds.Rate(link)}[/]";
         }
-    }
 
-    private static string? Rate(double? bytesPerSec, IReadOnlyList<double> history, Theme theme)
-    {
-        if (MetricFormat.Throughput(bytesPerSec) is not string text)
-            return null;
-
-        string blocks = Sparkline.ForThroughput(history);
-        return blocks.Length == 0 ? text : $"{text,-RateWidth} [{theme.Accent}]{theme.Glyphs.Spark(blocks)}[/]";
-    }
-
-    /// <returns>Rates, attachment and temperature of one drive, or null when none is known.</returns>
-    private static string? Drive(StorageMetrics drive, Theme theme)
-    {
-        var parts = new List<string>();
-
-        if (drive.ReadBytesPerSec is not null || drive.WriteBytesPerSec is not null)
+        string? text = (drive.Interconnect, drive.IsExternal) switch
         {
-            parts.Add($"R {MetricFormat.Throughput(drive.ReadBytesPerSec) ?? Dashboard.Missing}  " +
-                      $"W {MetricFormat.Throughput(drive.WriteBytesPerSec) ?? Dashboard.Missing}");
-        }
+            (_, false) => Temperature(drive.TempC) ?? "internal",
+            (null, true) => "external",
+            (string bus, _) => bus,
+            _ => Temperature(drive.TempC)
+        };
 
-        if (Attachment(drive) is string attachment)
-            parts.Add($"[{theme.Muted}]{Markup.Escape(attachment)}[/]");
-
-        if (Temperature(drive.TempC) is string temperature)
-            parts.Add(temperature);
-
-        return parts.Count == 0 ? null : string.Join(" · ", parts);
+        return text is null ? null : $"[{theme.Muted}]{Markup.Escape(MetricFormat.Truncate(text, TailWidth))}[/]";
     }
 
-    /// <summary>"USB external" says what matters; internal buses ("Apple Fabric", "PCI-Express") just read "internal".</summary>
-    private static string? Attachment(StorageMetrics drive) => (drive.Interconnect, drive.IsExternal) switch
-    {
-        (_, false) => "internal",
-        (string link, true) => $"{link} external",
-        (null, true) => "external",
-        (string link, null) => link,
-        _ => null
-    };
+    private static string VolumeLabel(VolumeSpace volume) =>
+        volume.Name == VolumeFilter.StartupDiskName ? StartupLabel : MetricFormat.Truncate(volume.Name, Dashboard.LabelWidth);
 
     private static string Fill(VolumeSpace volume, HealthThresholds t, Theme theme)
     {
         string color = theme.Of(DiagnosticsEngine.VolumeLevel(volume, t));
         int filled = MetricFormat.FilledCells(volume.UsedPct, BarWidth);
         string bar = $"[{color}]{new string(theme.Glyphs.BarFull, filled)}[/][{theme.Muted}]{new string(theme.Glyphs.BarEmpty, BarWidth - filled)}[/]";
+        string percent = MetricFormat.AlignRight($"{volume.UsedPct:0} %", PercentWidth);
+        string free = MetricFormat.AlignRight(MetricFormat.Memory(volume.FreeBytes), FreeWidth);
         string fileSystem = volume.FileSystem.Length > 0 ? $" [{theme.Muted}]{Markup.Escape(volume.FileSystem)}[/]" : "";
 
-        return $"{bar} [{color}]{volume.UsedPct:0} %[/] · {MetricFormat.Memory(volume.FreeBytes)} free{fileSystem}";
+        return $"{bar} [{color}]{percent}[/] {free} free{fileSystem}";
     }
 
     private static string? Temperature(double? tempC) =>

@@ -28,6 +28,13 @@ internal static class Sparkline
     }
 
     /// <summary>
+    /// The newest <paramref name="length"/> blocks, padded with blanks on the left, so a curve has its
+    /// full length from the first sample and new values always enter at the same place.
+    /// </summary>
+    public static string Fixed(string blocks, int length) =>
+        (blocks.Length > length ? blocks[^length..] : blocks).PadLeft(length);
+
+    /// <summary>
     /// Fits the scale to the values so small real changes stay visible, but never narrower than
     /// <paramref name="minSpan"/> (so sensor noise is not blown up) and never outside the bounds.
     /// </summary>

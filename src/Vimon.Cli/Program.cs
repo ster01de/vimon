@@ -71,7 +71,6 @@ if (cli.Once)
 int selectedGpu = 0;
 bool running = true;
 bool paused = false;
-int frame = 0;
 bool redrawRequested = false;
 // The widget runs all day in a desktop panel, so it only redraws when there is a new sample.
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
@@ -79,9 +78,6 @@ bool canReadKeys = !Console.IsInputRedirected;
 var history = MetricHistory.Empty;
 SystemSnapshot? snapshot = null;
 long nextSampleAt = 0;
-IReadOnlyList<string> spinner = AnsiConsole.Profile.Capabilities.Unicode
-    ? Spinner.Known.Dots.Frames
-    : ["|", "/", "-", "\\"];
 
 // Ctrl+C ends the loop normally so the alternate screen, cursor and sensors are restored and disposed.
 Console.CancelKeyPress += (_, e) =>
@@ -107,7 +103,6 @@ void RunLiveView()
             SampleIfDue();
             DrawFrame();
             WaitForKeys(redrawIntervalMs);
-            frame++;
         }
     }
     finally
@@ -137,7 +132,7 @@ void DrawFrame()
     redrawRequested = false;
 }
 
-// Sensors are read every sampleIntervalMs; the view redraws faster so the spinner animates smoothly.
+// Sensors are read every sampleIntervalMs; the view redraws faster so a resized window or a key shows quickly.
 void SampleIfDue()
 {
     long now = Environment.TickCount64;
@@ -157,14 +152,15 @@ IRenderable BuildView(int width)
     var gpu = GpuAt(current, selectedGpu);
     var diagnostics = DiagnosticsEngine.Evaluate(current);
 
+    string clock = current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture);
+
     if (mode == ViewMode.Widget)
-        return WidgetRenderer.Build(current, gpu, diagnostics, history,
-            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture), theme));
+        return WidgetRenderer.Build(current, gpu, diagnostics, history, new WidgetOptions(width, clock, theme));
 
     if (mode == ViewMode.Compact)
         return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
 
-    var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused, theme);
+    var options = new DashboardOptions(width, hideMissing, clock, paused, theme);
     return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
 }
 
@@ -285,7 +281,7 @@ static Theme ApplyTheme(Theme? requested)
 }
 
 // The classic Windows console shows symbols its font lacks as '?'. Switching Spectre's Unicode
-// capability off makes it use an ASCII spinner and square borders; vimon's own symbols follow.
+// capability off makes it use square borders; vimon's own symbols follow.
 static Theme ApplyGlyphs(Theme theme, bool asciiRequested)
 {
     bool legacyConsole = Glyphs.IsLegacyWindowsConsole(
