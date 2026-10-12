@@ -101,7 +101,7 @@ Not available yet: the Linux backend is planned.
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 
-¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU · ⁵ physical interfaces only: VPN tunnels and virtual adapters are left out, because their traffic also passes Wi-Fi or Ethernet
+¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU · ⁵ physical interfaces: loopback, VPN tunnels and known virtual adapters are left out, because their traffic also passes Wi-Fi or Ethernet
 
 Missing values are shown as `—`, never as `0` or `ERROR`. Press `H` to hide them.
 

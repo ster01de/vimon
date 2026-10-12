@@ -59,6 +59,27 @@ public class ByteRateTrackerTests
     }
 
     [Fact]
+    public void TreatsALargeDropAsAResetRatherThanAWrap()
+    {
+        var tracker = ByteRateTracker.WrappingAt(1UL << 32);
+        var (_, next) = tracker.Advance([En0(2UL << 30, 0)], Start);
+
+        var (rates, _) = next.Advance([En0(1000, 0)], Start + TimeSpan.FromSeconds(1));
+
+        Assert.Null(Assert.Single(rates).DownBytesPerSec);
+    }
+
+    [Fact]
+    public void CountsAnInterfaceListedTwiceOnlyOnce()
+    {
+        var (_, tracker) = ByteRateTracker.Empty.Advance([En0(1000, 0), En0(1000, 0)], Start);
+
+        var (rates, _) = tracker.Advance([En0(2000, 0), En0(2000, 0)], Start + TimeSpan.FromSeconds(1));
+
+        Assert.Equal(new InterfaceRate("en0", 1000, 0), Assert.Single(rates));
+    }
+
+    [Fact]
     public void ReportsNoRateForAnInterfaceThatJustAppeared()
     {
         var (_, tracker) = ByteRateTracker.Empty.Advance([En0(1000, 500)], Start);
@@ -130,6 +151,8 @@ public class NetworkInterfaceFilterTests
     [InlineData("ap1", false)]
     [InlineData("bridge0", false)]
     [InlineData("anpi0", false)]
+    [InlineData("vmenet0", false)]
+    [InlineData("feth1", false)]
     [InlineData("", false)]
     public void KeepsOnlyPhysicalMacInterfaces(string name, bool expected) =>
         Assert.Equal(expected, NetworkInterfaceFilter.IsMacPhysicalName(name));
@@ -139,6 +162,8 @@ public class NetworkInterfaceFilterTests
     [InlineData("Realtek PCIe 2.5GbE Family Controller", false)]
     [InlineData("Hyper-V Virtual Ethernet Adapter", true)]
     [InlineData("WireGuard Tunnel", true)]
+    [InlineData("Tailscale Tunnel", true)]
+    [InlineData("Microsoft Wi-Fi Direct Virtual Adapter", true)]
     [InlineData("TAP-Windows Adapter V9", true)]
     [InlineData("Bluetooth Device (Personal Area Network)", true)]
     public void RecognisesVirtualWindowsAdapters(string description, bool expected) =>

@@ -16,20 +16,23 @@ internal sealed class WindowsNetwork
     /// <returns>Rates of the physical adapters that are up; empty when the adapter list cannot be read.</returns>
     public IReadOnlyList<InterfaceRate> Read()
     {
-        List<ByteCounters> counters;
+        NetworkInterface[] adapters;
 
         try
         {
-            counters = NetworkInterface.GetAllNetworkInterfaces()
-                .Where(IsRelevant)
-                .Select(ToCounters)
-                .Where(c => c.InBytes > 0 || c.OutBytes > 0)
-                .ToList();
+            adapters = NetworkInterface.GetAllNetworkInterfaces();
         }
         catch (NetworkInformationException)
         {
             return [];
         }
+
+        var counters = adapters
+            .Where(IsRelevant)
+            .Select(ToCounters)
+            .OfType<ByteCounters>()
+            .Where(c => c.InBytes > 0 || c.OutBytes > 0)
+            .ToList();
 
         var (rates, next) = _tracker.Advance(counters, Stopwatch.GetElapsedTime(_start));
         _tracker = next;
@@ -38,16 +41,25 @@ internal sealed class WindowsNetwork
 
     private static bool IsRelevant(NetworkInterface adapter) =>
         adapter.OperationalStatus == OperationalStatus.Up
-        && adapter.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel)
+        // Ppp covers L2TP, SSTP and dial-up VPNs, whose traffic also passes a physical adapter.
+        && adapter.NetworkInterfaceType is not (NetworkInterfaceType.Loopback or NetworkInterfaceType.Tunnel or NetworkInterfaceType.Ppp)
         && !NetworkInterfaceFilter.IsWindowsVirtualDescription(adapter.Description);
 
-    private static ByteCounters ToCounters(NetworkInterface adapter)
+    /// <returns>Null for an adapter that went away after the list was read, so the others still count.</returns>
+    private static ByteCounters? ToCounters(NetworkInterface adapter)
     {
-        var statistics = adapter.GetIPStatistics();
+        try
+        {
+            var statistics = adapter.GetIPStatistics();
 
-        return new ByteCounters(
-            adapter.Name,
-            (ulong)Math.Max(0, statistics.BytesReceived),
-            (ulong)Math.Max(0, statistics.BytesSent));
+            return new ByteCounters(
+                adapter.Name,
+                (ulong)Math.Max(0, statistics.BytesReceived),
+                (ulong)Math.Max(0, statistics.BytesSent));
+        }
+        catch (Exception ex) when (ex is NetworkInformationException or PlatformNotSupportedException)
+        {
+            return null;
+        }
     }
 }

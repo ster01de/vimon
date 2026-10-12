@@ -11,7 +11,7 @@ public sealed record ByteCounters(string Name, ulong InBytes, ulong OutBytes);
 /// </summary>
 public sealed class ByteRateTracker
 {
-    /// <summary>For full 64-bit counters: a counter that goes down was reset.</summary>
+    /// <summary>A tracker without wrap bridging, for full 64-bit counters: a counter that goes down was reset.</summary>
     public static readonly ByteRateTracker Empty = new(ImmutableDictionary<string, ByteCounters>.Empty, sampledAt: null, counterRange: null);
 
     private readonly ImmutableDictionary<string, ByteCounters> _previous;
@@ -27,8 +27,8 @@ public sealed class ByteRateTracker
 
     /// <summary>
     /// For counters that keep only their low bits and start again at 0 after
-    /// <paramref name="counterRange"/> - 1. A drop by more than half the range is read as such a
-    /// wrap, a smaller drop as a reset.
+    /// <paramref name="counterRange"/> - 1. A drop is read as such a wrap only when the bytes it
+    /// implies stay below a quarter of the range; anything else is a reset.
     /// </summary>
     public static ByteRateTracker WrappingAt(ulong counterRange) => new(Empty._previous, sampledAt: null, counterRange);
 
@@ -40,12 +40,11 @@ public sealed class ByteRateTracker
     public (IReadOnlyList<InterfaceRate> Rates, ByteRateTracker Next) Advance(IReadOnlyList<ByteCounters> counters, TimeSpan now)
     {
         double? seconds = _sampledAt is TimeSpan before && now > before ? (now - before).TotalSeconds : null;
-        var rates = counters.Select(current => Rate(current, seconds)).ToList();
 
-        // A name can repeat if the OS lists an interface twice; the last entry wins.
-        var next = counters
-            .GroupBy(c => c.Name)
-            .ToImmutableDictionary(group => group.Key, group => group.Last());
+        // A name can repeat if the OS lists an interface twice; the last entry wins, so it is counted once.
+        var unique = counters.GroupBy(c => c.Name).Select(group => group.Last()).ToList();
+        var rates = unique.Select(current => Rate(current, seconds)).ToList();
+        var next = unique.ToImmutableDictionary(c => c.Name);
 
         return (rates, new ByteRateTracker(next, now, _counterRange));
     }
@@ -66,9 +65,10 @@ public sealed class ByteRateTracker
         if (after >= before)
             return (after - before) / seconds;
 
-        if (_counterRange is ulong range && before < range && before - after > range / 2)
-            return (range - before + after) / seconds;
+        if (_counterRange is not ulong range || before >= range)
+            return null;
 
-        return null;
+        ulong wrapped = range - before + after;
+        return wrapped < range / 4 ? wrapped / seconds : null;
     }
 }
