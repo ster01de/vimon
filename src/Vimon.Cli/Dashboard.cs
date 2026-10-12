@@ -20,6 +20,12 @@ internal static class Dashboard
     internal const int LabelWidth = 10;
     private const int ValueWidth = 8;
     private const int SparkLength = MetricHistory.Capacity;
+    // Border and padding on both sides of a panel.
+    private const int PanelChrome = 4;
+    // Content width of the narrower panel of a pair at SideBySideMinWidth.
+    private const int SubtitleWidth = (SideBySideMinWidth - 1) / 2 - PanelChrome;
+    // "● LIVE 14:02:11", so PAUSED does not shift the key hints.
+    private const int StateWidth = 15;
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
     private const int MaxNetworkInterfaces = 3;
@@ -47,7 +53,7 @@ internal static class Dashboard
 
         return new Rows(
             Header(options, theme),
-            StatusPanel(diagnostics, theme),
+            StatusPanel(diagnostics, options.Width, theme),
             PanelLayout.Pair(CpuPanel(s, history, options, t, theme), GpuPanel(s, gpu, selectedGpu, history, options, t, theme), options.Width),
             PanelLayout.PairUp(lower, options.Width));
     }
@@ -59,22 +65,28 @@ internal static class Dashboard
         if (o.Clock is null)
             return new Markup($"[bold]VIMON[/]{hidden}");
 
-        // A still clock instead of a spinner: the header only changes when there is a new sample.
+        // A still clock instead of a spinner, in a fixed width so PAUSED moves nothing after it.
         string state = o.IsPaused
-            ? $"[{theme.Warning}]PAUSED[/]"
-            : $"[{theme.Good}]{theme.Glyphs.Bullet} LIVE {Markup.Escape(o.Clock)}[/]";
+            ? $"[{theme.Warning}]{"PAUSED".PadRight(StateWidth)}[/]"
+            : $"[{theme.Good}]{Markup.Escape($"{theme.Glyphs.Bullet} LIVE {o.Clock}".PadRight(StateWidth))}[/]";
 
         return new Markup(
-            $"[bold]VIMON[/]  {state}{hidden}   [{theme.Muted}]q quit · p pause · h hide {Missing} · c compact · ←/→ GPU[/]");
+            $"[bold]VIMON[/]  {state}   [{theme.Muted}]q quit · p pause · h hide {Missing} · c compact · ←/→ GPU[/]{hidden}");
     }
 
-    /// <remarks>The worst token sits in the header, so the status reads without colour too.</remarks>
-    private static IRenderable StatusPanel(IReadOnlyList<Diagnostic> diagnostics, Theme theme)
+    /// <remarks>
+    /// The worst token sits in the header, so the status reads without colour too. Always
+    /// <see cref="MaxStatusRows"/> lines, each cut to one line, so a new finding moves nothing below;
+    /// the most severe findings come first.
+    /// </remarks>
+    private static IRenderable StatusPanel(IReadOnlyList<Diagnostic> diagnostics, int width, Theme theme)
     {
         var worst = HealthStyle.Worst(diagnostics);
         var lines = diagnostics
+            .OrderByDescending(d => d.Level)
             .Take(MaxStatusRows)
-            .Select(d => new Markup($"[{theme.Of(d.Level)}]{FindingMarker(d.Level, theme)}[/] {Markup.Escape(d.Message)}"));
+            .Select(d => StatusLine(d, width, theme))
+            .Concat(Enumerable.Repeat<IRenderable>(new Text(" "), Math.Max(0, MaxStatusRows - diagnostics.Count)));
 
         return new Panel(new Rows(lines))
         {
@@ -83,6 +95,14 @@ internal static class Dashboard
             BorderStyle = theme.StyleOf(worst),
             Expand = true
         };
+    }
+
+    private static IRenderable StatusLine(Diagnostic d, int width, Theme theme)
+    {
+        string marker = FindingMarker(d.Level, theme);
+        // Cut before escaping, so an escaped '[' can never be split in half.
+        string message = MetricFormat.Truncate(d.Message, width - PanelChrome - marker.Length - 1);
+        return new Markup($"[{theme.Of(d.Level)}]{marker}[/] {Markup.Escape(message)}");
     }
 
     private static string FindingMarker(HealthLevel level, Theme theme) =>
@@ -189,7 +209,7 @@ internal static class Dashboard
     {
         IRenderable body = subtitle is null
             ? content
-            : new Rows(new Markup($"[bold]{Markup.Escape(subtitle)}[/]"), content);
+            : new Rows(new Markup($"[bold]{Markup.Escape(MetricFormat.Truncate(subtitle, SubtitleWidth))}[/]"), content);
 
         return new Section(title, body, theme.MutedStyle);
     }

@@ -61,6 +61,7 @@ internal static class PanelLayout
         }
     }
 
+    // A panel ends every line, its bottom border included, with a line break.
     private static int LineCount(IRenderable panel, RenderOptions options, int width) =>
         panel.Render(options, width).Count(segment => segment.IsLineBreak);
 

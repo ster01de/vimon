@@ -54,6 +54,38 @@ public class DashboardLayoutTests
     }
 
     [Fact]
+    public void KeepsTheKeyHintsInPlaceWhenPaused()
+    {
+        static int HintColumn(bool paused) =>
+            LineWith(Render(Snapshot(), options: new DashboardOptions(80, Clock: "14:02:11", IsPaused: paused)), "VIMON")
+                .IndexOf("q quit", StringComparison.Ordinal);
+
+        Assert.Equal(HintColumn(false), HintColumn(true));
+    }
+
+    [Fact]
+    public void KeepsTheStatusHeightWhenFindingsComeAndGo()
+    {
+        var calm = Steady();
+        var alarming = Steady() with
+        {
+            Cpu = new CpuMetrics("Hot CPU", 99, 10, null, null),
+            Volumes = [new VolumeSpace("Startup disk", "/", "apfs", 1UL << 30, 228UL << 30)],
+            Storage = [new StorageMetrics("TOSHIBA External USB 3.0 with a very long name indeed", null) { IsExternal = true, UsbLink = UsbSpeed.High }]
+        };
+
+        Assert.Equal(Lines(Render(calm)).Length, Lines(Render(alarming)).Length);
+    }
+
+    [Fact]
+    public void ShowsTheFreeSpaceOfLargeVolumesInFull()
+    {
+        var snapshot = Steady() with { Volumes = [new VolumeSpace("Big", "/Volumes/Big", "exfat", 1900UL << 30, 4000UL << 30)] };
+
+        Assert.Contains($"{1900.0:0.0} GB free", LineWith(Render(snapshot), "Big"));
+    }
+
+    [Fact]
     public void EndsBothPanelsOfAPairOnTheSameLine()
     {
         // CPU (5 rows) beside GPU (one line), MEMORY (3) beside PROCESSES (5), NETWORK (3) beside DISK (6).

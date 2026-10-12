@@ -16,7 +16,8 @@ internal static class DiskPanel
     // Sized so a row fits a side-by-side panel at 100 columns (45 cells after the 10-cell label) without wrapping.
     private const int BarWidth = 6;
     private const int PercentWidth = 5;
-    private const int FreeWidth = 8;
+    // "1862.4 GB"
+    private const int FreeWidth = 9;
     private const int RateWidth = MetricFormat.ThroughputWidth;
     // "R 999 KB/s W 999 KB/s"
     private const int RateCellsWidth = 2 * (2 + RateWidth) + 1;
@@ -59,15 +60,15 @@ internal static class DiskPanel
     }
 
     /// <summary>
-    /// Which process causes the traffic, e.g. <c>Finder       R    0 B/s W  110 MB/s</c>; a dash while
-    /// nothing reads or writes, so the row stays.
+    /// Which process causes the traffic, e.g. <c>Finder       R    0 B/s W  110 MB/s</c>; null (a dash)
+    /// while nothing reads or writes.
     /// </summary>
-    private static string BusiestProcess(IReadOnlyList<ProcessUsage> top, Theme theme)
+    private static string? BusiestProcess(IReadOnlyList<ProcessUsage> top, Theme theme)
     {
         var process = top.FirstOrDefault();
 
         if (process is null || (process.DiskReadBytesPerSec ?? 0) + (process.DiskWriteBytesPerSec ?? 0) <= 0)
-            return $"[{theme.Muted}]{Dashboard.Missing}[/]";
+            return null;
 
         // Cut before escaping, so an escaped '[' can never be split in half.
         string name = Markup.Escape(MetricFormat.Truncate(process.Name, ProcessNameWidth).PadRight(ProcessNameWidth));

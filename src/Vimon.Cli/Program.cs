@@ -72,6 +72,7 @@ int selectedGpu = 0;
 bool running = true;
 bool paused = false;
 bool redrawRequested = false;
+(int Width, int Height) drawnSize = (0, 0);
 // The widget runs all day in a desktop panel, so it only redraws when there is a new sample.
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
@@ -98,11 +99,17 @@ void RunLiveView()
 
     try
     {
+        // The view only changes with a new sample, a key or a resized window, so other frames are skipped.
+        bool changed = true;
+
         while (running)
         {
-            SampleIfDue();
-            DrawFrame();
-            WaitForKeys(redrawIntervalMs);
+            changed |= SampleIfDue();
+
+            if (changed || CurrentSize() != drawnSize)
+                DrawFrame();
+
+            changed = WaitForKeys(redrawIntervalMs);
         }
     }
     finally
@@ -113,9 +120,12 @@ void RunLiveView()
 
 // Absolute positioning (see ScreenFrame) repairs a resized window with the next frame. Without ANSI
 // support the cursor cannot be placed, so frames are simply written one after another.
+(int Width, int Height) CurrentSize() => (mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth(), GetWindowHeight());
+
 void DrawFrame()
 {
-    int width = mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth();
+    drawnSize = CurrentSize();
+    int width = drawnSize.Width;
     var view = BuildView(width);
     var capabilities = AnsiConsole.Profile.Capabilities;
 
@@ -127,23 +137,25 @@ void DrawFrame()
     }
 
     string rendered = ScreenFrame.Render(view, width, capabilities.ColorSystem, capabilities.Unicode);
-    Console.Out.Write(ScreenFrame.Compose(rendered, GetWindowHeight(), redrawRequested));
+    Console.Out.Write(ScreenFrame.Compose(rendered, drawnSize.Height, redrawRequested));
     Console.Out.Flush();
     redrawRequested = false;
 }
 
-// Sensors are read every sampleIntervalMs; the view redraws faster so a resized window or a key shows quickly.
-void SampleIfDue()
+// Sensors are read every sampleIntervalMs; keys and window size are checked more often so they show quickly.
+// Returns true when there is a new sample.
+bool SampleIfDue()
 {
     long now = Environment.TickCount64;
 
     if (snapshot is not null && (paused || now < nextSampleAt))
-        return;
+        return false;
 
     snapshot = ReadSnapshot();
     selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
     history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
     nextSampleAt = now + sampleIntervalMs;
+    return true;
 }
 
 IRenderable BuildView(int width)
@@ -164,17 +176,20 @@ IRenderable BuildView(int width)
     return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
 }
 
-void WaitForKeys(int budgetMs)
+// Returns true when a key changed the view.
+bool WaitForKeys(int budgetMs)
 {
     long end = Environment.TickCount64 + budgetMs;
 
     while (running && Environment.TickCount64 < end)
     {
         if (canReadKeys && Console.KeyAvailable && HandleKey(Console.ReadKey(intercept: true)))
-            return;
+            return true;
 
         Thread.Sleep(keyPollIntervalMs);
     }
+
+    return false;
 }
 
 // Returns true when the view should redraw right away.
