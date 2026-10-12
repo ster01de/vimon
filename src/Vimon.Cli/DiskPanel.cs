@@ -12,8 +12,9 @@ internal static class DiskPanel
     public const int MaxVolumes = 3;
 
     private const int MaxDrives = 3;
-    private const int BarWidth = 10;
-    private const int NameWidth = 18;
+    // Sized so a row fits a side-by-side panel at 100 columns without wrapping.
+    private const int BarWidth = 6;
+    private const int NameWidth = 16;
     private const int RateWidth = 10;
 
     /// <returns>Label/value rows; a null value is a missing reading.</returns>
@@ -74,13 +75,14 @@ internal static class DiskPanel
         return parts.Count == 0 ? null : string.Join(" · ", parts);
     }
 
+    /// <summary>"USB external" says what matters; internal buses ("Apple Fabric", "PCI-Express") just read "internal".</summary>
     private static string? Attachment(StorageMetrics drive) => (drive.Interconnect, drive.IsExternal) switch
     {
-        (null, null) => null,
+        (_, false) => "internal",
         (string link, true) => $"{link} external",
-        (string link, _) => link,
         (null, true) => "external",
-        _ => "internal"
+        (string link, null) => link,
+        _ => null
     };
 
     private static string Fill(VolumeSpace volume, HealthThresholds t, Theme theme)
