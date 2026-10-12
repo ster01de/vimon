@@ -93,6 +93,14 @@ public class TopProcessesTests
     }
 
     [Fact]
+    public void IgnoresCpuNoiseBelowTheShownDecimal()
+    {
+        var names = TopProcesses.Select([Usage(1, "b", 0.04, 10), Usage(2, "a", 0.01, 20)], 2).Select(u => u.Name);
+
+        Assert.Equal(new[] { "a", "b" }, names);
+    }
+
+    [Fact]
     public void KeepsOnlyTheRequestedCount()
     {
         var usages = Enumerable.Range(1, 10).Select(i => Usage(i, $"p{i}", i));
@@ -106,6 +114,8 @@ public class TopProcessesTests
     [InlineData(1, 0.5, true)]
     [InlineData(2, 0.5, false)]
     [InlineData(5, 2.0, true)]
+    [InlineData(5, 1.98, true)]
+    [InlineData(5, 1.5, false)]
     public void SamplesTwiceRightAwayThenOncePerInterval(int samplesTaken, double secondsSinceLast, bool expected) =>
         Assert.Equal(expected, TopProcesses.IsSampleDue(samplesTaken, TimeSpan.FromSeconds(secondsSinceLast), TimeSpan.FromSeconds(2)));
 }
@@ -116,6 +126,8 @@ public class ProcessNameTests
     [InlineData("Xcode", "Xcode")]
     [InlineData("evil\u001b[31mred", "evil[31mred")]
     [InlineData("  spaced  ", "spaced")]
+    [InlineData("spoof\u202Eexe.txt", "spoofexe.txt")]
+    [InlineData("Caf\u00E9 Helper \uFFFD", "Café Helper")]
     [InlineData("", "pid 42")]
     [InlineData(null, "pid 42")]
     public void RemovesControlCharactersAndNamesNamelessProcesses(string? name, string expected) =>

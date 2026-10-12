@@ -54,6 +54,7 @@ public class MetricFormatTests
     [InlineData("exactly10!", 10, "exactly10!")]
     [InlineData("much too long", 8, "much to…")]
     [InlineData("anything", 0, "")]
+    [InlineData("ab\U0001F600cd", 4, "ab…")]
     public void TruncatesWithAnEllipsis(string text, int width, string expected) =>
         Assert.Equal(expected, MetricFormat.Truncate(text, width));
 }

@@ -11,7 +11,7 @@ internal static class MetricFormat
     // 999.5 would round to "1000", so it already moves up to the next unit.
     private const double NextUnitAt = 999.5;
     private static readonly string[] ByteUnits = ["B", "K", "M", "G"];
-    // Memory in binary units, like the RAM row and Activity Monitor.
+    // Memory in binary units, like the RAM row.
     private const double Mebibyte = 1024 * 1024;
     private const double Gibibyte = Mebibyte * 1024;
 
@@ -84,7 +84,15 @@ internal static class MetricFormat
         if (text.Length <= width)
             return text;
 
-        return width <= 0 ? "" : text[..(width - 1)] + Ellipsis;
+        if (width <= 0)
+            return "";
+
+        // Never keep half of a surrogate pair (e.g. an emoji) in front of the ellipsis.
+        int keep = width - 1;
+        if (keep > 0 && char.IsHighSurrogate(text[keep - 1]))
+            keep--;
+
+        return text[..keep] + Ellipsis;
     }
 
     /// <summary>Cuts or pads to exactly <paramref name="width"/>; a width of 0 or less leaves the line as it is.</summary>

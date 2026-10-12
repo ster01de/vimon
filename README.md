@@ -164,7 +164,7 @@ WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K
   OS memory pressure elevated
 ```
 
-While the status is WARN or CRIT, the second line also names the busiest process (`· top Xcode 23%`); the widget shows it as a `TOP` row. Process names only appear on your screen; vimon stores and sends nothing, and `--no-processes` hides them for screen sharing.
+While the status is WARN or CRIT, the second line also names the busiest process (`· top Xcode 23%`); the widget shows it as a `TOP` row. vimon stores and sends nothing, but process names are shown on screen and printed by `--once`, so they can end up in screenshots, recordings or status-bar logs; `--no-processes` leaves them out.
 
 `vimon --once --compact` prints it once without cutting it to the window, so it can feed a status bar. For example in tmux:
 
