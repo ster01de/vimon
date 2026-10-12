@@ -185,10 +185,13 @@ public class DashboardTests
 
         string output = Render(snapshot);
 
-        Assert.Contains("99 %", LineWith(output, "Startup disk"));
-        Assert.Contains($"{2.7:0.0} GB free", LineWith(output, "Startup disk"));
-        Assert.Contains("ntfs", LineWith(output, "TOSHIBA"));
-        Assert.True(output.IndexOf("Startup disk", StringComparison.Ordinal) < output.IndexOf("TOSHIBA", StringComparison.Ordinal));
+        // STATUS names the full disk too; the DISK panel comes after it.
+        var diskLines = Lines(output).SkipWhile(line => !line.Contains("DISK", StringComparison.Ordinal)).ToList();
+        string startup = diskLines.First(line => line.Contains("Startup disk", StringComparison.Ordinal));
+        Assert.Contains("99 %", startup);
+        Assert.Contains($"{2.7:0.0} GB free", startup);
+        Assert.Contains("ntfs", diskLines.First(line => line.Contains("TOSHIBA", StringComparison.Ordinal)));
+        Assert.True(diskLines.FindIndex(l => l.Contains("Startup disk")) < diskLines.FindIndex(l => l.Contains("TOSHIBA")));
     }
 
     [Fact]
