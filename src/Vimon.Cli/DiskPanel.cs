@@ -41,9 +41,21 @@ internal static class DiskPanel
             .OrderByDescending(d => (d.ReadBytesPerSec ?? 0) + (d.WriteBytesPerSec ?? 0))
             .ThenBy(d => d.Name, StringComparer.Ordinal)
             .Take(MaxDrives)
-            .Select(drive => (MetricFormat.Truncate(drive.Name, NameWidth), Drive(drive, theme))));
+            .SelectMany(drive => DriveRows(drive, theme)));
 
         return rows;
+    }
+
+    /// <summary>The drive row, plus a row with its USB link below, so neither gets too long for a side-by-side panel.</summary>
+    private static IEnumerable<(string Label, string? Value)> DriveRows(StorageMetrics drive, Theme theme)
+    {
+        yield return (MetricFormat.Truncate(drive.Name, NameWidth), Drive(drive, theme));
+
+        if (drive.UsbLink is UsbSpeed link)
+        {
+            string color = UsbSpeeds.IsSlow(link) ? theme.Info : theme.Muted;
+            yield return ("", $"[{color}]↳ {UsbSpeeds.Describe(link)}[/]");
+        }
     }
 
     private static string? Rate(double? bytesPerSec, IReadOnlyList<double> history, Theme theme)

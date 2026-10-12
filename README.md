@@ -102,6 +102,7 @@ Not available yet: the Linux backend is planned.
 | OS memory pressure | — | ✓ |
 | Free disk space per volume | ✓ | ✓ |
 | Disk throughput per drive (read, write) | ✓ ¹ | ✓ |
+| USB link of external drives (USB 2.0 … USB 3.2 Gen 2x2) | — | ✓ |
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 | Busiest processes (CPU, memory) | planned | ✓ ⁶ |
@@ -129,7 +130,7 @@ The STATUS section sits at the top and lists what is worth a look right now.
 | OS memory pressure (macOS) | warning | critical |
 | OS thermal state (macOS) | serious | critical |
 
-PCIe running narrower than supported while the GPU is above 50 % load is reported as info.
+PCIe running narrower than supported while the GPU is above 50 % load is reported as info, and so is an external drive on a USB 2.0 link (or a USB 2.0 hub on the way), which caps copying at roughly 40 MB/s.
 
 ⁷ not for volumes with 100 GB or more still free. On macOS the free space is what `df` reports; Finder adds purgeable space and may show more.
 
@@ -274,7 +275,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
 - [ ] Busiest processes on Windows
-- [ ] USB link speed of external drives, busiest disk process
+- [ ] Busiest disk process
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
 - [ ] AI section: local inference servers, loaded model, tokens per second

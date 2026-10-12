@@ -55,6 +55,9 @@ public sealed record StorageMetrics(string Name, double? TempC)
     public string? Interconnect { get; init; }
 
     public bool? IsExternal { get; init; }
+
+    /// <summary>The slowest USB link between the drive and the computer, hubs included; null for non-USB drives.</summary>
+    public UsbSpeed? UsbLink { get; init; }
 }
 
 public sealed record SystemSnapshot(

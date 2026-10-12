@@ -6,7 +6,11 @@ using static Vimon.Platform.MacOS.MacNative;
 namespace Vimon.Platform.MacOS;
 
 /// <summary>Name and attachment of one drive, found by walking up from its storage driver.</summary>
-internal sealed record MacDiskTopology(string Name, string? Interconnect, bool? IsExternal, bool IsDiskImage);
+/// <param name="UsbLink">The slowest USB link up to the controller, so a USB 2.0 hub shows up too.</param>
+internal sealed record MacDiskTopology(string Name, string? Interconnect, bool? IsExternal, bool IsDiskImage)
+{
+    public UsbSpeed? UsbLink { get; init; }
+}
 
 /// <summary>
 /// Read and write throughput per drive from the "Statistics" of every IOBlockStorageDriver,
@@ -17,7 +21,8 @@ internal sealed record MacDiskTopology(string Name, string? Interconnect, bool? 
 internal sealed class MacDisks
 {
     private const string DriverClass = "IOBlockStorageDriver";
-    private const int MaxParentDepth = 12;
+    // Driver → SCSI and mass storage layers → USB device → hubs → controller: about 15 levels.
+    private const int MaxParentDepth = 24;
 
     private readonly Dictionary<ulong, MacDiskTopology> _topologies = [];
     private readonly long _start = Stopwatch.GetTimestamp();
@@ -59,7 +64,8 @@ internal sealed class MacDisks
             ReadBytesPerSec = rate.DownBytesPerSec,
             WriteBytesPerSec = rate.UpBytesPerSec,
             Interconnect = drive.Interconnect,
-            IsExternal = drive.IsExternal
+            IsExternal = drive.IsExternal,
+            UsbLink = drive.UsbLink
         };
 
     private static (long Read, long Written)? ReadBytes(IntPtr statistics)
@@ -80,16 +86,23 @@ internal sealed class MacDisks
         return topology;
     }
 
-    /// <summary>The first "Protocol Characteristics" and "Device Characteristics" above the driver.</summary>
+    /// <summary>
+    /// The first "Protocol Characteristics" and "Device Characteristics" above the driver, and the
+    /// slowest USB link on the way up to the controller.
+    /// </summary>
     private static MacDiskTopology ReadTopology(uint driver)
     {
         (string? Interconnect, string? Location)? protocol = null;
         (string? Vendor, string? Product)? device = null;
+        UsbSpeed? slowest = null;
         uint current = driver;
         bool ownsCurrent = false;
 
-        for (int depth = 0; depth < MaxParentDepth && (protocol is null || device is null); depth++)
+        for (int depth = 0; depth < MaxParentDepth; depth++)
         {
+            if (UsbSpeedOf(current) is UsbSpeed speed && (slowest is null || speed < slowest))
+                slowest = speed;
+
             protocol ??= MacRegistry.WithDictionary(current, "Protocol Characteristics", d =>
                 ((string?, string?)?)(MacRegistry.DictionaryString(d, "Physical Interconnect"),
                     MacRegistry.DictionaryString(d, "Physical Interconnect Location")));
@@ -110,7 +123,19 @@ internal sealed class MacDisks
         if (ownsCurrent)
             IOObjectRelease(current);
 
-        return MacDiskNames.Describe(device?.Vendor, device?.Product, protocol?.Interconnect, protocol?.Location);
+        return MacDiskNames.Describe(device?.Vendor, device?.Product, protocol?.Interconnect, protocol?.Location)
+            with { UsbLink = slowest };
+    }
+
+    /// <summary>USB devices and hubs carry their link speed; "USBSpeed" is the newer key, "Device Speed" the older.</summary>
+    private static UsbSpeed? UsbSpeedOf(uint entry)
+    {
+        if (MacRegistry.ReadInt64Property(entry, "USBSpeed") is long hostSpeed)
+            return UsbSpeeds.FromHostConnectionSpeed(hostSpeed);
+
+        return MacRegistry.ReadInt64Property(entry, "Device Speed") is long deviceSpeed
+            ? UsbSpeeds.FromDeviceSpeed(deviceSpeed)
+            : null;
     }
 }
 

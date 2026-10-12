@@ -200,7 +200,10 @@ public class DashboardTests
         StorageMetrics[] drives =
         [
             new("APPLE SSD", null) { ReadBytesPerSec = 1_000, WriteBytesPerSec = 0, Interconnect = "Apple Fabric", IsExternal = false },
-            new("TOSHIBA External USB 3.0", null) { ReadBytesPerSec = 0, WriteBytesPerSec = 110_000_000, Interconnect = "USB", IsExternal = true }
+            new("TOSHIBA External USB 3.0", null)
+            {
+                ReadBytesPerSec = 0, WriteBytesPerSec = 110_000_000, Interconnect = "USB", IsExternal = true, UsbLink = UsbSpeed.Super
+            }
         ];
         var snapshot = new SystemSnapshot(DateTimeOffset.UnixEpoch, new CpuMetrics("Test CPU", 50, 10, 20, 3000), [], Memory, drives);
 
@@ -210,6 +213,8 @@ public class DashboardTests
         string toshiba = diskLines.First(line => line.Contains("TOSHIBA", StringComparison.Ordinal));
         Assert.Contains("W 110 MB/s", toshiba);
         Assert.Contains("USB external", toshiba);
+        int toshibaRow = diskLines.FindIndex(l => l.Contains("TOSHIBA"));
+        Assert.Contains("↳ USB 3.2 Gen 1 · 5 Gb/s", diskLines[toshibaRow + 1]);
         Assert.True(diskLines.FindIndex(l => l.Contains("TOSHIBA")) < diskLines.FindIndex(l => l.Contains("APPLE SSD")));
     }
 
