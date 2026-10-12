@@ -41,9 +41,32 @@ vimon --hide-missing    # start with empty rows hidden (toggle with H)
 vimon --once            # one frame, then exit
 vimon --compact         # one- or two-line view (toggle with C)
 vimon --once --compact  # single status line, e.g. for tmux or SketchyBar
+vimon --widget          # borderless list for a desktop panel (see below)
 ```
 
 The live view runs in the terminal's alternate screen, like `top`: resizing does not leave copies in the scrollback, and your previous terminal content returns when you quit with `Q`, `Esc` or `Ctrl+C`. Give the window at least ~40 rows to see everything; shorter windows are cut from the bottom, STATUS stays on top.
+
+## Desktop widget with kitty
+
+[kitty](https://sw.kovidgoyal.net/kitty/) 0.42 or newer can show a terminal program as a borderless panel on the desktop. `vimon --widget` is made for it: no borders, no header, no background colours, so kitty's transparency shows through.
+
+```bash
+brew install --cask kitty
+/Applications/kitty.app/Contents/MacOS/kitten panel --detach \
+  --edge=none --columns=31 --lines=8 \
+  --margin-left=20 --margin-top=40 \
+  --layer=bottom -o background_opacity=0.25 \
+  /usr/local/bin/vimon --widget
+```
+
+- `--edge=none` anchors the panel at the top-left corner; move it with `--margin-left` and `--margin-top` (pixels).
+- `--layer=bottom` keeps it behind your windows like a desktop widget; `--layer=top` keeps it above them.
+- `background_opacity` goes from `0` (fully transparent) to `1`.
+- `--lines=8` fits status, two findings, CPU, GPU, RAM, pressure and thermal state.
+
+The panel takes no keyboard input. Stop it with `pkill -f "vimon --widget"`. Starting it automatically at login is not built in yet.
+
+All panel options: `kitten panel --help`.
 
 ## No root needed
 
@@ -86,6 +109,7 @@ Press `H` to hide these rows.
 | *"vimon" cannot be opened* | `xattr -d com.apple.quarantine vimon` |
 | Temperatures `—` | Expected in virtual machines without SMC sensors. |
 | Frame cut off with *… more lines* | Make the terminal window taller. |
+| Widget cut off in the kitty panel | Raise `--lines` or `--columns`. |
 
 ## Build from source
 

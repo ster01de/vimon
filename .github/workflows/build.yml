@@ -35,6 +35,17 @@ jobs:
           echo "$output"
           grep -q "Thermal" <<< "$output"
           grep -q "Pressure" <<< "$output"
+      - name: Smoke test widget output
+        run: |
+          output=$(dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build -- --once --widget)
+          echo "$output"
+          grep -q "^CPU" <<< "$output"
+          # The widget sits on a transparent desktop panel: no borders, header or key help.
+          if grep -q -e "╭" -e "│" -e "VIMON" <<< "$output"; then exit 1; fi
+      - name: Unknown options fail with a message
+        run: |
+          if dotnet run --project src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 --no-build -- --bogus 2> err.txt; then exit 1; fi
+          grep -q "unknown option '--bogus'" err.txt
       - name: Publish macOS arm64 preview
         run: |
           dotnet publish src/Vimon.Cli/Vimon.Cli.csproj -c Release -f net8.0 -r osx-arm64 \

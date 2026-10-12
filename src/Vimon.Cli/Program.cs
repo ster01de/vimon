@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using Spectre.Console;
@@ -18,6 +19,20 @@ const int onceWarmupMs = 500;
 const int onceRetryMs = 250;
 const int onceMaxWaitMs = 2000;
 const int minWidth = 42;
+const string timestampFormat = "HH:mm:ss";
+
+CliOptions cli;
+
+try
+{
+    cli = CliOptions.Parse(args);
+}
+catch (ArgumentException ex)
+{
+    Console.Error.WriteLine($"vimon: {ex.Message}");
+    Environment.ExitCode = 2;
+    return;
+}
 
 using IPlatformTelemetry? telemetry = TryCreateTelemetry();
 
@@ -29,10 +44,10 @@ if (telemetry is null)
 
 Console.OutputEncoding = Encoding.UTF8;
 
-bool hideMissing = args.Contains("--hide-missing");
-bool compact = args.Contains("--compact");
+bool hideMissing = cli.HideMissing;
+var mode = cli.Mode;
 
-if (args.Contains("--once"))
+if (cli.Once)
 {
     // CPU load is a delta between two samples. macOS tick counters can stall for ~800 ms, so keep
     // sampling until load shows up instead of trusting a single warm-up interval.
@@ -48,17 +63,7 @@ if (args.Contains("--once"))
         first = telemetry.Read();
     }
 
-    var onceGpu = GpuAt(first, 0);
-    var onceDiagnostics = DiagnosticsEngine.Evaluate(first);
-
-    // Compact one-shot output is meant for status bars and scripts, so it is never cut to the window.
-    if (compact)
-        Console.Write(CompactRenderer.Render(first, onceGpu, onceDiagnostics, 0, maxWidth: null));
-    else
-        AnsiConsole.Write(Dashboard.Build(
-            first, onceGpu, onceDiagnostics, 0, MetricHistory.Empty,
-            new DashboardOptions(AnsiConsole.Profile.Width, hideMissing)));
-
+    WriteOnce(first);
     return;
 }
 
@@ -67,6 +72,8 @@ bool running = true;
 bool paused = false;
 int frame = 0;
 int lastWidth = -1;
+// The widget runs all day in a desktop panel, so it only redraws when there is a new sample.
+int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
 var history = MetricHistory.Empty;
 SystemSnapshot? snapshot = null;
@@ -105,7 +112,7 @@ void RunLiveView()
                     SampleIfDue();
                     context.UpdateTarget(BuildView());
                     context.Refresh();
-                    WaitForKeys(frameIntervalMs);
+                    WaitForKeys(redrawIntervalMs);
                     frame++;
                 }
             });
@@ -135,7 +142,7 @@ IRenderable BuildView()
     var current = snapshot!;
     var gpu = GpuAt(current, selectedGpu);
     var diagnostics = DiagnosticsEngine.Evaluate(current);
-    int width = GetSafeWidth();
+    int width = mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth();
 
     // A narrower window re-wraps the previous frame, so start from a clean screen after a resize.
     if (width != lastWidth)
@@ -144,7 +151,11 @@ IRenderable BuildView()
         lastWidth = width;
     }
 
-    if (compact)
+    if (mode == ViewMode.Widget)
+        return WidgetRenderer.Build(current, gpu, diagnostics, history,
+            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture)));
+
+    if (mode == ViewMode.Compact)
         return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
 
     var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused);
@@ -167,11 +178,18 @@ void WaitForKeys(int budgetMs)
 // Returns true when the view should redraw right away.
 bool HandleKey(ConsoleKey key)
 {
+    if (key is ConsoleKey.Q or ConsoleKey.Escape)
+    {
+        running = false;
+        return true;
+    }
+
+    // The widget has no visible state for pause or GPU selection, so a stray key must not freeze or change it.
+    if (mode == ViewMode.Widget)
+        return false;
+
     switch (key)
     {
-        case ConsoleKey.Q or ConsoleKey.Escape:
-            running = false;
-            return true;
         case ConsoleKey.P or ConsoleKey.Spacebar:
             paused = !paused;
             return true;
@@ -179,7 +197,7 @@ bool HandleKey(ConsoleKey key)
             hideMissing = !hideMissing;
             return true;
         case ConsoleKey.C:
-            compact = !compact;
+            mode = CliOptions.ToggleCompact(mode);
             return true;
         case ConsoleKey.RightArrow:
             SelectGpu(selectedGpu + 1);
@@ -202,6 +220,29 @@ void SelectGpu(int index)
 
     selectedGpu = clamped;
     history = history.WithoutGpu();
+}
+
+void WriteOnce(SystemSnapshot s)
+{
+    var gpu = GpuAt(s, 0);
+    var diagnostics = DiagnosticsEngine.Evaluate(s);
+
+    switch (mode)
+    {
+        // Compact one-shot output is meant for status bars and scripts, so it is never cut to the window.
+        case ViewMode.Compact:
+            Console.Write(CompactRenderer.Render(s, gpu, diagnostics, 0, maxWidth: null));
+            break;
+        case ViewMode.Widget:
+            AnsiConsole.Write(WidgetRenderer.Build(s, gpu, diagnostics, MetricHistory.Empty,
+                new WidgetOptions(Console.IsOutputRedirected ? WidgetRenderer.MaxWidth : GetWidgetWidth())));
+            break;
+        default:
+            AnsiConsole.Write(Dashboard.Build(
+                s, gpu, diagnostics, 0, MetricHistory.Empty,
+                new DashboardOptions(AnsiConsole.Profile.Width, hideMissing)));
+            break;
+    }
 }
 
 static GpuMetrics? GpuAt(SystemSnapshot s, int index) =>
@@ -240,4 +281,11 @@ static int GetSafeWidth()
 {
     try { return Math.Max(minWidth, Console.WindowWidth - 1); }
     catch { return 80; }
+}
+
+// Desktop panels are often only as wide as the widget, so the width follows the window down to a minimum.
+static int GetWidgetWidth()
+{
+    try { return Math.Clamp(Console.WindowWidth - 1, WidgetRenderer.MinWidth, WidgetRenderer.MaxWidth); }
+    catch { return WidgetRenderer.MaxWidth; }
 }

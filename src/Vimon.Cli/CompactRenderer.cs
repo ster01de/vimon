@@ -26,18 +26,16 @@ internal static class CompactRenderer
         int? maxWidth)
     {
         var findings = diagnostics.Where(d => d.Level != HealthLevel.Good).ToList();
-        var worst = diagnostics.Count == 0 ? HealthLevel.Good : diagnostics.Max(d => d.Level);
-
-        var segments = new List<string> { LevelToken(worst) };
-        AddSegment(segments, "CPU", Temperature(s.Cpu?.TempC), Percent(s.Cpu?.LoadPct));
+        var segments = new List<string> { HealthStyle.Token(HealthStyle.Worst(diagnostics)) };
+        AddSegment(segments, "CPU", MetricFormat.ShortTemperature(s.Cpu?.TempC), MetricFormat.ShortPercent(s.Cpu?.LoadPct));
 
         if (gpu is not null)
         {
             string label = s.Gpus.Count > 1 ? $"GPU {selectedGpu + 1}/{s.Gpus.Count}" : "GPU";
-            AddSegment(segments, label, Temperature(gpu.CoreTempC), Percent(gpu.UtilizationPct));
+            AddSegment(segments, label, MetricFormat.ShortTemperature(gpu.CoreTempC), MetricFormat.ShortPercent(gpu.UtilizationPct));
         }
 
-        AddSegment(segments, "RAM", Percent(s.Memory.LoadPct));
+        AddSegment(segments, "RAM", MetricFormat.ShortPercent(s.Memory.LoadPct));
 
         var lines = new List<string> { string.Join(Separator, segments) };
 
@@ -46,7 +44,7 @@ internal static class CompactRenderer
 
         var b = new StringBuilder();
         foreach (string line in lines)
-            b.AppendLine(maxWidth is int width ? Fit(line, width) : line);
+            b.AppendLine(maxWidth is int width ? MetricFormat.Fit(line, width) : line);
 
         return b.ToString();
     }
@@ -57,32 +55,5 @@ internal static class CompactRenderer
 
         if (present.Count > 0)
             segments.Add($"{label} {string.Join(' ', present)}");
-    }
-
-    private static string LevelToken(HealthLevel level) => level switch
-    {
-        HealthLevel.Critical => "CRIT",
-        HealthLevel.Warning => "WARN",
-        HealthLevel.Info => "INFO",
-        _ => "OK"
-    };
-
-    private static string? Temperature(double? value) =>
-        IsPresent(value) && value > 0 ? $"{value:0}°C" : null;
-
-    private static string? Percent(double? value) =>
-        IsPresent(value) ? $"{value:0}%" : null;
-
-    private static bool IsPresent(double? value) =>
-        value is double v && !double.IsNaN(v) && !double.IsInfinity(v);
-
-    private static string Fit(string line, int width)
-    {
-        if (width <= 0)
-            return line;
-
-        return line.Length > width
-            ? line[..(width - 1)] + "…"
-            : line.PadRight(width);
     }
 }

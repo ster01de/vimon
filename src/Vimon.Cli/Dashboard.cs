@@ -20,11 +20,6 @@ internal static class Dashboard
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
     private const int MaxStorageRows = 3;
-    // Sparklines scale to the recent values, but span at least this much so noise stays flat.
-    private const double SparkTempMinSpanC = 10;
-    private const double SparkTempMaxC = 130;
-    private const double SparkLoadMinSpanPct = 20;
-    private const double SparkLoadMaxPct = 100;
 
     public static IRenderable Build(
         SystemSnapshot s,
@@ -60,16 +55,16 @@ internal static class Dashboard
 
     private static IRenderable StatusPanel(IReadOnlyList<Diagnostic> diagnostics)
     {
-        var worst = diagnostics.Count == 0 ? HealthLevel.Good : diagnostics.Max(d => d.Level);
+        var worst = HealthStyle.Worst(diagnostics);
         var lines = diagnostics
             .Take(MaxStatusRows)
-            .Select(d => new Markup($"[{ColorName(d.Level)}]●[/] {Markup.Escape(d.Message)}"));
+            .Select(d => new Markup($"[{HealthStyle.ColorName(d.Level)}]●[/] {Markup.Escape(d.Message)}"));
 
         return new Panel(new Rows(lines))
         {
             Header = new PanelHeader(" STATUS "),
             Border = BoxBorder.Rounded,
-            BorderStyle = new Style(ColorOf(worst)),
+            BorderStyle = new Style(HealthStyle.ColorOf(worst)),
             Expand = true
         };
     }
@@ -85,7 +80,7 @@ internal static class Dashboard
         };
 
         if (s.Thermal is ThermalState thermal)
-            rows.Add(("Thermal", $"[{ThermalColor(thermal)}]{thermal}[/]"));
+            rows.Add(("Thermal", $"[{HealthStyle.ThermalColor(thermal)}]{thermal}[/]"));
 
         return Section("CPU", cpu?.Name ?? "Unknown CPU", MetricsGrid(rows, o.HideMissing));
     }
@@ -116,7 +111,7 @@ internal static class Dashboard
     private static Panel MemoryPanel(SystemSnapshot s, HealthThresholds t)
     {
         var m = s.Memory;
-        string color = ColorName(t.RamLoadPct.Classify(m.LoadPct));
+        string color = HealthStyle.ColorName(t.RamLoadPct.Classify(m.LoadPct));
         var rows = new List<(string Label, string? Value)>
         {
             ("RAM", $"{m.UsedGb:0.0} / {m.TotalGb:0.0} GB"),
@@ -124,7 +119,7 @@ internal static class Dashboard
         };
 
         if (m.Pressure is MemoryPressure pressure)
-            rows.Add(("Pressure", $"[{PressureColor(pressure)}]{pressure}[/]"));
+            rows.Add(("Pressure", $"[{HealthStyle.PressureColor(pressure)}]{pressure}[/]"));
 
         return Section("MEMORY", subtitle: null, MetricsGrid(rows, hideMissing: false));
     }
@@ -201,27 +196,27 @@ internal static class Dashboard
 
     private static string? Temperature(double? value, Threshold threshold, IReadOnlyList<double> history)
     {
-        if (!IsPresent(value) || value <= 0)
+        if (!MetricFormat.IsPresent(value) || value <= 0)
             return null;
 
         string text = $"{value:0.#} °C";
-        return $"[{ColorName(threshold.Classify(value!.Value))}]{text,-ValueWidth}[/]{Spark(history, SparkTempMinSpanC, SparkTempMaxC)}";
+        return $"[{HealthStyle.ColorName(threshold.Classify(value!.Value))}]{text,-ValueWidth}[/]{Spark(Sparkline.ForTemperature(history))}";
     }
 
     private static string? Percent(double? value, IReadOnlyList<double> history)
     {
-        if (!IsPresent(value))
+        if (!MetricFormat.IsPresent(value))
             return null;
 
         string text = $"{value:0.#} %";
-        return $"{text,-ValueWidth}{Spark(history, SparkLoadMinSpanPct, SparkLoadMaxPct)}";
+        return $"{text,-ValueWidth}{Spark(Sparkline.ForLoad(history))}";
     }
 
     private static string? Celsius(double? value) =>
-        IsPresent(value) && value > 0 ? $"{value:0.#} °C" : null;
+        MetricFormat.IsPresent(value) && value > 0 ? $"{value:0.#} °C" : null;
 
     private static string? Watts(double? value) =>
-        IsPresent(value) && value > 0 ? $"{value:0.#} W" : null;
+        MetricFormat.IsPresent(value) && value > 0 ? $"{value:0.#} W" : null;
 
     private static string? GpuMemory(GpuMetrics gpu)
     {
@@ -246,51 +241,12 @@ internal static class Dashboard
             : current;
     }
 
-    private static string Spark(IReadOnlyList<double> history, double minSpan, double upperBound)
-    {
-        if (history.Count == 0)
-            return "";
-
-        var (min, max) = Sparkline.Scale(history, minSpan, lowerBound: 0, upperBound);
-        return $" [steelblue]{Sparkline.Render(history, min, max)}[/]";
-    }
+    private static string Spark(string blocks) =>
+        blocks.Length == 0 ? "" : $" [steelblue]{blocks}[/]";
 
     private static string Bar(double percent, string color)
     {
-        int filled = (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * BarWidth, MidpointRounding.AwayFromZero);
+        int filled = MetricFormat.FilledCells(percent, BarWidth);
         return $"[{color}]{new string('█', filled)}[/][grey]{new string('░', BarWidth - filled)}[/]";
     }
-
-    private static bool IsPresent(double? value) =>
-        value is double v && !double.IsNaN(v) && !double.IsInfinity(v);
-
-    private static string ColorName(HealthLevel level) => level switch
-    {
-        HealthLevel.Critical => "red",
-        HealthLevel.Warning => "yellow",
-        HealthLevel.Info => "blue",
-        _ => "green"
-    };
-
-    private static Color ColorOf(HealthLevel level) => level switch
-    {
-        HealthLevel.Critical => Color.Red,
-        HealthLevel.Warning => Color.Yellow,
-        HealthLevel.Info => Color.Blue,
-        _ => Color.Green
-    };
-
-    private static string ThermalColor(ThermalState state) => state switch
-    {
-        ThermalState.Critical => "red",
-        ThermalState.Serious => "yellow",
-        _ => "green"
-    };
-
-    private static string PressureColor(MemoryPressure pressure) => pressure switch
-    {
-        MemoryPressure.Critical => "red",
-        MemoryPressure.Warning => "yellow",
-        _ => "green"
-    };
 }
