@@ -269,6 +269,19 @@ public class WidgetRendererTests
     }
 
     [Fact]
+    public void AddsTheBusiestProcessOnlyWhenSomethingIsWrong()
+    {
+        ProcessUsage[] top = [new(1, "Google Chrome Helper (Renderer)", 23.4, 1)];
+
+        Assert.DoesNotContain("TOP", Render(Snapshot() with { TopProcesses = top }));
+
+        var lines = Lines(Render(Snapshot(Cpu(tempC: 95, loadPct: 10)) with { TopProcesses = top }));
+        string line = Assert.Single(lines, l => l.StartsWith("TOP"));
+        Assert.Equal("TOP Google Chrome Helper… 23%", line);
+        Assert.True(line.Length <= WidgetRenderer.MaxWidth);
+    }
+
+    [Fact]
     public void SurvivesANonFiniteRamPercentage()
     {
         var broken = Snapshot() with { Memory = Memory with { LoadPct = double.NaN } };

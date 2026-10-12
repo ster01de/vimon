@@ -100,8 +100,9 @@ Not available yet: the Linux backend is planned.
 | OS memory pressure | — | ✓ |
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
+| Busiest processes (CPU, memory) | planned | ✓ ⁶ |
 
-¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU · ⁵ physical interfaces: loopback, VPN tunnels and known virtual adapters are left out, because their traffic also passes Wi-Fi or Ethernet
+¹ run as administrator · ² when the GPU and driver expose it · ³ hottest GPU sensor · ⁴ unified memory in use by the GPU · ⁵ physical interfaces: loopback, VPN tunnels and known virtual adapters are left out, because their traffic also passes Wi-Fi or Ethernet · ⁶ your own processes: without root, macOS does not reveal CPU time and memory of other users' processes such as WindowServer
 
 Missing values are shown as `—`, never as `0` or `ERROR`. Press `H` to hide them.
 
@@ -149,6 +150,7 @@ Options:
 --widget         borderless list for transparent desktop panels (see below)
 --hide-missing   start with rows without a value hidden
 --theme <name>   default, mono or high-contrast (see below)
+--no-processes   hide process names, e.g. while sharing your screen
 ```
 
 The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. If the window is too short, the view is cut from the bottom; STATUS always stays visible.
@@ -161,6 +163,8 @@ For small terminal panes, tmux and status bars. The first word is the overall st
 WARN │ CPU 47°C 33% │ GPU 41°C 18% │ RAM 81% │ NET ↓1.2M ↑310K
   OS memory pressure elevated
 ```
+
+While the status is WARN or CRIT, the second line also names the busiest process (`· top Xcode 23%`); the widget shows it as a `TOP` row. vimon stores and sends nothing, but process names are shown on screen and printed by `--once`, so they can end up in screenshots, recordings or status-bar logs; `--no-processes` leaves them out.
 
 `vimon --once --compact` prints it once without cutting it to the window, so it can feed a status bar. For example in tmux:
 

@@ -55,13 +55,13 @@ if (cli.Once)
     telemetry.Read();
     Thread.Sleep(onceWarmupMs);
 
-    var first = telemetry.Read();
+    var first = ReadSnapshot();
     long deadline = Environment.TickCount64 + onceMaxWaitMs;
 
     while (first.Cpu is not null && first.Cpu.LoadPct is null && Environment.TickCount64 < deadline)
     {
         Thread.Sleep(onceRetryMs);
-        first = telemetry.Read();
+        first = ReadSnapshot();
     }
 
     WriteOnce(first);
@@ -132,7 +132,7 @@ void SampleIfDue()
     if (snapshot is not null && (paused || now < nextSampleAt))
         return;
 
-    snapshot = telemetry.Read();
+    snapshot = ReadSnapshot();
     selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
     history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
     nextSampleAt = now + sampleIntervalMs;
@@ -221,6 +221,13 @@ void SelectGpu(int index)
 
     selectedGpu = clamped;
     history = history.WithoutGpu();
+}
+
+// --no-processes drops the names before any view sees them.
+SystemSnapshot ReadSnapshot()
+{
+    var read = telemetry.Read();
+    return cli.NoProcesses ? read with { TopProcesses = [], ProcessScope = ProcessScope.None } : read;
 }
 
 void WriteOnce(SystemSnapshot s)

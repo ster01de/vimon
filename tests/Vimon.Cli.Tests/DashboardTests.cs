@@ -136,6 +136,41 @@ public class DashboardTests
         Assert.DoesNotContain("NETWORK", Render(Snapshot(), hideMissing: true));
     }
 
+    private static SystemSnapshot WithProcesses(SystemSnapshot snapshot, params ProcessUsage[] processes) =>
+        snapshot with { TopProcesses = processes, ProcessScope = ProcessScope.CurrentUser };
+
+    [Fact]
+    public void ListsTheBusiestProcessesOfTheUser()
+    {
+        var snapshot = WithProcesses(
+            Snapshot(), new ProcessUsage(1, "Xcode", 23.4, 4UL << 30), new ProcessUsage(2, "Finder", null, 300UL << 20));
+
+        string output = Render(snapshot);
+
+        Assert.Contains("PROCESSES · yours", output);
+        Assert.Contains($"{23.4:0.0} %", LineWith(output, "Xcode"));
+        Assert.Contains($"{4.0:0.0} GB", LineWith(output, "Xcode"));
+        Assert.Contains("300 MB", LineWith(output, "Finder"));
+    }
+
+    [Fact]
+    public void EscapesAndShortensProcessNames()
+    {
+        var snapshot = WithProcesses(Snapshot(), new ProcessUsage(1, "[evil] " + new string('x', 40), 1, 1));
+
+        string output = Render(snapshot);
+
+        Assert.Contains("[evil] xxxxxxxxxxxx…", output);
+    }
+
+    [Fact]
+    public void ShowsNoProcessPanelWhenTheBackendReadsNone()
+    {
+        Assert.DoesNotContain("PROCESSES", Render(Snapshot()));
+        Assert.DoesNotContain("PROCESSES", Render(WithProcesses(Snapshot()), hideMissing: true));
+        Assert.Contains("PROCESSES", Render(WithProcesses(Snapshot())));
+    }
+
     [Fact]
     public void ShowsGpuMemoryUsedAndTotal()
     {

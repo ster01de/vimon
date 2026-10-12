@@ -32,6 +32,13 @@ public class MetricFormatTests
         Assert.Equal(Localised(brief), MetricFormat.ShortThroughput(bytesPerSec));
     }
 
+    [Fact]
+    public void FormatsMemoryInBinaryUnits()
+    {
+        Assert.Equal("300 MB", MetricFormat.Memory(300UL << 20));
+        Assert.Equal($"{4.5:0.0} GB", MetricFormat.Memory((ulong)(4.5 * (1UL << 30))));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData(-1.0)]
@@ -47,6 +54,7 @@ public class MetricFormatTests
     [InlineData("exactly10!", 10, "exactly10!")]
     [InlineData("much too long", 8, "much to…")]
     [InlineData("anything", 0, "")]
+    [InlineData("ab\U0001F600cd", 4, "ab…")]
     public void TruncatesWithAnEllipsis(string text, int width, string expected) =>
         Assert.Equal(expected, MetricFormat.Truncate(text, width));
 }
