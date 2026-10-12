@@ -52,6 +52,11 @@ public static class DiagnosticsEngine
         else if (s.Thermal == ThermalState.Serious)
             list.Add(new(HealthLevel.Warning, "THERMAL_SERIOUS", "System thermal state serious, throttling likely"));
 
+        // Info, not a warning: the drive may only speak USB 2.0, but often a port, cable or hub is the limit.
+        foreach (var drive in s.Storage.Where(d => d.UsbLink is UsbSpeed link && UsbSpeeds.IsSlow(link)))
+            list.Add(new(HealthLevel.Info, "USB_LINK",
+                $"{drive.Name}: {UsbSpeeds.Describe(drive.UsbLink!.Value)}, a USB 3 port, cable or hub can be up to 10x faster"));
+
         foreach (var volume in s.Volumes)
             AddByLevel(list, VolumeLevel(volume, t), "DISK_FULL", "DISK_LOW",
                 $"{volume.Name}: {volume.FreeBytes / BytesPerGb:0.0} GB free ({volume.UsedPct:0}% used)");

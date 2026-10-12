@@ -32,7 +32,7 @@ public class MacDisksTests
     [Fact]
     public void CarriesRatesAndAttachmentIntoTheModel()
     {
-        var drive = new MacDiskTopology("TOSHIBA External USB 3.0", "USB", true, false);
+        var drive = new MacDiskTopology("TOSHIBA External USB 3.0", "USB", true, false) { UsbLink = UsbSpeed.Super };
 
         var metrics = MacDisks.ToMetrics(drive, new InterfaceRate("42", 1000, 2000));
 
@@ -41,6 +41,7 @@ public class MacDisksTests
         Assert.Equal(2000, metrics.WriteBytesPerSec);
         Assert.Equal("USB", metrics.Interconnect);
         Assert.True(metrics.IsExternal);
+        Assert.Equal(UsbSpeed.Super, metrics.UsbLink);
     }
 
     [MacOSFact]

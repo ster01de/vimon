@@ -87,6 +87,25 @@ internal static class MacRegistry
         }
     }
 
+    public static long? ReadInt64Property(uint entry, string key)
+    {
+        IntPtr value = CopyProperty(entry, key);
+
+        if (value == IntPtr.Zero)
+            return null;
+
+        try
+        {
+            return CFGetTypeID(value) == CFNumberGetTypeID() && CFNumberGetValue(value, CFNumberSInt64Type, out long number)
+                ? number
+                : null;
+        }
+        finally
+        {
+            CFRelease(value);
+        }
+    }
+
     public static double? DictionaryNumber(IntPtr dictionary, string key)
     {
         IntPtr value = DictionaryValue(dictionary, key);
