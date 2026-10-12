@@ -57,6 +57,7 @@ All NVIDIA, AMD and Intel GPUs are listed; switch with `←` / `→`. PCIe data 
 | Symptom | Fix |
 |---|---|
 | CPU temperature `—` | Run as administrator. |
+| Symbols show as `?` | The classic console window (no tabs, e.g. after *Run as administrator*) uses a font without them. vimon detects it and switches to ASCII symbols; for the full look use *Windows Terminal (Admin)* (Win+X) or set the console font to *Cascadia Mono*. `--ascii` forces the plain symbols anywhere. |
 | PCIe `—` on an NVIDIA GPU | Make sure `nvidia-smi` is on `PATH` (it ships with the NVIDIA driver). |
 | PCIe `—` on AMD / Intel | Expected: PCIe data currently comes from `nvidia-smi` only. |
 | Frame cut off with *… more lines* | Make the terminal window taller. |

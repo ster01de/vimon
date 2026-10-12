@@ -19,6 +19,13 @@ public class CliOptionsTests
     }
 
     [Fact]
+    public void ReadsAscii()
+    {
+        Assert.True(CliOptions.Parse(["--ascii"]).Ascii);
+        Assert.False(CliOptions.Parse([]).Ascii);
+    }
+
+    [Fact]
     public void ReadsNoProcesses()
     {
         Assert.True(CliOptions.Parse(["--no-processes"]).NoProcesses);
