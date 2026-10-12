@@ -43,6 +43,7 @@ vimon --compact         # one- or two-line view (toggle with C)
 vimon --once --compact  # single status line, e.g. for tmux or SketchyBar
 vimon --widget          # borderless list for a desktop panel (see below)
 vimon --theme mono      # no colours; also chosen automatically when NO_COLOR is set
+vimon --no-processes    # leave process names out, e.g. while sharing the screen
 ```
 
 The live view runs in the terminal's alternate screen, like `top`: resizing does not leave copies in the scrollback, and your previous terminal content returns when you quit with `Q`, `Esc` or `Ctrl+C`. Give the window at least ~40 rows to see everything; shorter windows are cut from the bottom, STATUS stays on top.

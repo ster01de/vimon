@@ -6,7 +6,7 @@
 
 A focused terminal monitor for the hardware metrics that actually matter.
 
-`CPU · GPU · VRAM · RAM · PCIe · Thermals`
+`CPU · GPU · VRAM · RAM · PCIe · Thermals · Network · Processes`
 
 ![Vimon live view on an Apple M2](docs/assets/vimon-demo.gif)
 
@@ -35,11 +35,13 @@ Vimon does the opposite: it surfaces the handful of metrics that help you decide
 - Is GPU memory getting uncomfortable?
 - Is RAM pressure becoming a problem?
 - Is the GPU actually using the expected PCIe link?
+- Which process is keeping the machine busy?
+- Is the network moving data right now?
 - Is anything worth investigating now?
 
 No 300-row sensor table. No hunting through labels.
 
-![Vimon dashboard: STATUS on top, CPU and GPU side by side with sparklines, memory bar below](docs/assets/vimon.png)
+![Vimon dashboard: STATUS on top, CPU and GPU side by side with sparklines, then memory and the busiest processes, network throughput and storage](docs/assets/vimon.png)
 
 <sub>Still frame from the same recording.</sub>
 
@@ -206,7 +208,7 @@ Vimon is not trying to replace HWiNFO, lm-sensors, iStat Menus or vendor tools.
 
 Those tools expose data.
 
-Vimon tries to expose **meaning**: the STATUS panel on top says in one line per finding what deserves attention, and its border turns green, yellow or red with the worst one. Temperatures and bars use the same thresholds, so colour always means the same thing.
+Vimon tries to expose **meaning**: the STATUS panel on top says in one line per finding what deserves attention, names the worst level in its header (`STATUS · WARN`) and turns its border green, yellow or red with it. Temperatures and bars use the same thresholds, so colour always means the same thing, and nothing depends on colour alone.
 
 ---
 
@@ -234,10 +236,10 @@ The CLI has two target frameworks: `net8.0-windows` uses the LibreHardwareMonito
 
 ```text
 src/
-├── Vimon.Core               models, diagnostics, nvidia-smi parsing
-├── Vimon.Cli                terminal UI (renderer, window fitting, input loop)
-├── Vimon.Platform.Windows   LibreHardwareMonitor + nvidia-smi
-├── Vimon.Platform.MacOS     Mach, sysctl, IORegistry, SMC, NSProcessInfo
+├── Vimon.Core               models, diagnostics, rate trackers (network, processes), nvidia-smi parsing
+├── Vimon.Cli                terminal UI on Spectre.Console: full, compact and widget views, themes, input loop
+├── Vimon.Platform.Windows   LibreHardwareMonitor, nvidia-smi, .NET network statistics
+├── Vimon.Platform.MacOS     Mach, sysctl, IORegistry, SMC, NSProcessInfo, routing table, libproc
 └── Vimon.Platform.Linux     planned
 tests/
 ├── Vimon.Core.Tests
@@ -264,6 +266,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 ### Next
 
 - [ ] Load [profiles](profiles/) and add Apple Silicon thresholds
+- [ ] Busiest processes on Windows
 - [ ] Disk throughput
 - [ ] `--json` output
 - [ ] Linux backend and Linux release builds
