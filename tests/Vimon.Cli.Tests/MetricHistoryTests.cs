@@ -27,6 +27,17 @@ public class MetricHistoryTests
     }
 
     [Fact]
+    public void AppendsTheTotalNetworkRates()
+    {
+        var snapshot = Snapshot(cpuTempC: 40) with { Network = [new("en0", 1000, 10), new("en7", 500, null)] };
+
+        var history = MetricHistory.Empty.Append(snapshot, gpu: null);
+
+        Assert.Equal(new[] { 1500.0 }, history.NetDownBps);
+        Assert.Equal(new[] { 10.0 }, history.NetUpBps);
+    }
+
+    [Fact]
     public void KeepsOnlyTheMostRecentSamples()
     {
         var history = MetricHistory.Empty;

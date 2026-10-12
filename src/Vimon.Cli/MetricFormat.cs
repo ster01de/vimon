@@ -4,6 +4,11 @@ namespace Vimon.Cli;
 internal static class MetricFormat
 {
     private const string Ellipsis = "…";
+    // Decimal units like Activity Monitor and Task Manager's network graphs.
+    private const double UnitStep = 1000;
+    // 999.5 would round to "1000", so it already moves up to the next unit.
+    private const double NextUnitAt = 999.5;
+    private static readonly string[] ByteUnits = ["B", "K", "M", "G"];
 
     public static bool IsPresent(double? value) =>
         value is double v && !double.IsNaN(v) && !double.IsInfinity(v);
@@ -16,11 +21,47 @@ internal static class MetricFormat
     public static string? ShortPercent(double? value) =>
         IsPresent(value) ? $"{value:0}%" : null;
 
+    /// <returns>Bytes per second such as <c>512 B/s</c>, <c>310 KB/s</c> or <c>1.2 MB/s</c>; null when missing.</returns>
+    public static string? Throughput(double? bytesPerSec)
+    {
+        if (!IsPresent(bytesPerSec) || bytesPerSec < 0)
+            return null;
+
+        var (value, unit) = ScaleBytes(bytesPerSec!.Value);
+        return unit == "B" ? $"{value:0} B/s" : $"{Number(value)} {unit}B/s";
+    }
+
+    /// <returns>Bytes per second in at most four characters such as <c>512B</c>, <c>310K</c> or <c>1.2M</c>; null when missing.</returns>
+    public static string? ShortThroughput(double? bytesPerSec)
+    {
+        if (!IsPresent(bytesPerSec) || bytesPerSec < 0)
+            return null;
+
+        var (value, unit) = ScaleBytes(bytesPerSec!.Value);
+        return unit == "B" ? $"{value:0}B" : $"{Number(value)}{unit}";
+    }
+
     /// <summary>Filled cells of a bar with <paramref name="cells"/> cells; 0 for a missing or non-finite value.</summary>
     public static int FilledCells(double percent, int cells) =>
         double.IsFinite(percent)
             ? (int)Math.Round(Math.Clamp(percent, 0, 100) / 100 * cells, MidpointRounding.AwayFromZero)
             : 0;
+
+    private static (double Value, string Unit) ScaleBytes(double bytes)
+    {
+        int unit = 0;
+
+        while (bytes >= NextUnitAt && unit < ByteUnits.Length - 1)
+        {
+            bytes /= UnitStep;
+            unit++;
+        }
+
+        return (bytes, ByteUnits[unit]);
+    }
+
+    // One decimal while the number is small, so 1.2 MB/s does not show as 1 MB/s.
+    private static string Number(double value) => value < 9.95 ? $"{value:0.0}" : $"{value:0}";
 
     /// <summary>Cuts <paramref name="text"/> to <paramref name="width"/>, ending in an ellipsis when cut.</summary>
     public static string Truncate(string text, int width)

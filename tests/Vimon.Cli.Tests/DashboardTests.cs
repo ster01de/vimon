@@ -101,6 +101,25 @@ public class DashboardTests
     }
 
     [Fact]
+    public void ShowsNetworkTotalsAndTheBusiestInterfaceFirst()
+    {
+        var snapshot = Snapshot() with { Network = [new("en7", 2_000, 1_000), new("en0", 1_200_000, 310_000)] };
+
+        string output = Render(snapshot);
+
+        Assert.Contains($"{1.2:0.0} MB/s", LineWith(output, "Down"));
+        Assert.Contains("311 KB/s", LineWith(output, "Up"));
+        Assert.True(output.IndexOf("en0", StringComparison.Ordinal) < output.IndexOf("en7", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void HidesTheNetworkPanelWithoutRatesOnlyWhenRequested()
+    {
+        Assert.Contains("NETWORK", Render(Snapshot()));
+        Assert.DoesNotContain("NETWORK", Render(Snapshot(), hideMissing: true));
+    }
+
+    [Fact]
     public void ShowsGpuMemoryUsedAndTotal()
     {
         string output = Render(Snapshot(gpus: Gpu(memoryUsedGb: 1.5, memoryTotalGb: 24)));

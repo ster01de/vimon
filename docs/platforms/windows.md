@@ -30,6 +30,7 @@ LibreHardwareMonitor needs driver access for many sensors. Without admin rights 
 | PCIe generation and lane width | `nvidia-smi` (NVIDIA only), matched to GPUs by model name |
 | RAM | `GlobalMemoryStatusEx` |
 | Storage temperature | LibreHardwareMonitor |
+| Network throughput | `NetworkInterface.GetIPStatistics` (64-bit counters). Left out: loopback, tunnels and virtual adapters (Hyper-V, VMware, VirtualBox, WireGuard, TAP, Bluetooth) |
 
 Which GPU values appear depends on what the GPU and driver expose through LibreHardwareMonitor. Missing values are shown as `—`.
 

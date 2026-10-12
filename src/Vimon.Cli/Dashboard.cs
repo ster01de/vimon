@@ -20,6 +20,7 @@ internal static class Dashboard
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
     private const int MaxStorageRows = 3;
+    private const int MaxNetworkInterfaces = 3;
 
     public static IRenderable Build(
         SystemSnapshot s,
@@ -31,14 +32,15 @@ internal static class Dashboard
         HealthThresholds? thresholds = null)
     {
         var t = thresholds ?? HealthThresholds.Default;
-        var memory = MemoryPanel(s, t);
-        var storage = StoragePanel(s, options);
+        var lower = new IRenderable?[] { MemoryPanel(s, t), NetworkPanel(s, history, options), StoragePanel(s, options) }
+            .OfType<IRenderable>()
+            .ToList();
 
         return new Rows(
             Header(options),
             StatusPanel(diagnostics),
             Pair(CpuPanel(s, history, options, t), GpuPanel(s, gpu, selectedGpu, history, options, t), options.Width),
-            storage is null ? memory : Pair(memory, storage, options.Width));
+            PairUp(lower, options.Width));
     }
 
     private static IRenderable Header(DashboardOptions o)
@@ -124,6 +126,29 @@ internal static class Dashboard
         return Section("MEMORY", subtitle: null, MetricsGrid(rows, hideMissing: false));
     }
 
+    /// <returns>Null when hiding missing values and no interface reports a rate.</returns>
+    private static Panel? NetworkPanel(SystemSnapshot s, MetricHistory h, DashboardOptions o)
+    {
+        var (down, up) = NetworkTotals.Of(s.Network);
+        var rows = new List<(string Label, string? Value)>
+        {
+            ("Down", Rate(down, h.NetDownBps)),
+            ("Up", Rate(up, h.NetUpBps))
+        };
+
+        // Busiest first; the name breaks ties so rows do not swap places while traffic is equal.
+        rows.AddRange(s.Network
+            .OrderByDescending(rate => (rate.DownBytesPerSec ?? 0) + (rate.UpBytesPerSec ?? 0))
+            .ThenBy(rate => rate.Name, StringComparer.Ordinal)
+            .Take(MaxNetworkInterfaces)
+            .Select(rate => (rate.Name, InterfaceRates(rate))));
+
+        if (o.HideMissing && rows.All(row => row.Value is null))
+            return null;
+
+        return Section("NETWORK", subtitle: null, MetricsGrid(rows, o.HideMissing));
+    }
+
     /// <returns>Null when hiding missing values and no drive reports a temperature.</returns>
     private static Panel? StoragePanel(SystemSnapshot s, DashboardOptions o)
     {
@@ -178,6 +203,10 @@ internal static class Dashboard
         return grid;
     }
 
+    /// <summary>Panels in pairs from left to right; an odd last panel takes the full width.</summary>
+    private static IRenderable PairUp(IReadOnlyList<IRenderable> panels, int width) =>
+        new Rows(panels.Chunk(2).Select(pair => pair.Length == 2 ? Pair(pair[0], pair[1], width) : pair[0]));
+
     /// <summary>Two panels splitting the window evenly, or stacked below <see cref="SideBySideMinWidth"/>.</summary>
     private static IRenderable Pair(IRenderable left, IRenderable right, int width)
     {
@@ -210,6 +239,19 @@ internal static class Dashboard
 
         string text = $"{value:0.#} %";
         return $"{text,-ValueWidth}{Spark(Sparkline.ForLoad(history))}";
+    }
+
+    private static string? Rate(double? bytesPerSec, IReadOnlyList<double> history) =>
+        MetricFormat.Throughput(bytesPerSec) is string text
+            ? $"{text,-ValueWidth}{Spark(Sparkline.ForThroughput(history))}"
+            : null;
+
+    private static string? InterfaceRates(InterfaceRate rate)
+    {
+        string? down = MetricFormat.Throughput(rate.DownBytesPerSec);
+        string? up = MetricFormat.Throughput(rate.UpBytesPerSec);
+
+        return down is null && up is null ? null : $"↓{down ?? Missing}  ↑{up ?? Missing}";
     }
 
     private static string? Celsius(double? value) =>
