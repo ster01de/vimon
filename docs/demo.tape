@@ -10,7 +10,7 @@ Output docs/assets/vimon-demo.gif
 Set Shell "bash"
 Set FontSize 15
 Set Width 1240
-Set Height 480
+Set Height 560
 Set Padding 16
 Set TypingSpeed 80ms
 

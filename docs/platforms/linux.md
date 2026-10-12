@@ -23,6 +23,8 @@ Linux exposes most of what Vimon needs as plain files, no extra daemons required
 | NVIDIA GPUs | `nvidia-smi` (the parser already lives in `Vimon.Core`) |
 | AMD GPU load and VRAM | `/sys/class/drm/card*/device/` |
 | GPU and NVMe temperatures | `/sys/class/hwmon` (`amdgpu`, `nvme`) |
+| Network throughput | `/proc/net/dev` |
+| Busiest processes | `/proc/<pid>/stat` and `/proc/<pid>/status` |
 
 Releases will follow the macOS pattern: self-contained `linux-x64` and `linux-arm64` tarballs built and smoke-tested in CI.
 
