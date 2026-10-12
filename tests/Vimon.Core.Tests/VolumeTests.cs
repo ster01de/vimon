@@ -70,6 +70,33 @@ public class VolumeTests
     }
 
     [Fact]
+    public void CleansEveryNameThatCouldReachTheTerminal()
+    {
+        const string evil = "USB\u001b]0;pwned\u0007\u001b[2J\u202E";
+        var snapshot = new SystemSnapshot(
+            DateTimeOffset.UnixEpoch,
+            new CpuMetrics(evil, null, null, null, null),
+            [new GpuMetrics(0, evil, Vendor.Apple, null, null, null, null, null, null, null, null, null, null, null, null, null, null)],
+            new MemoryMetrics(4, 16, 25, 5, 20),
+            [new StorageMetrics(evil, null)])
+        {
+            Network = [new InterfaceRate(evil, null, null)],
+            Volumes = [new VolumeSpace(evil, "/Volumes/" + evil, evil, 1, 2)],
+            TopProcesses = [new ProcessUsage(7, evil, null, 0)]
+        };
+
+        var clean = TerminalText.Clean(snapshot);
+
+        string[] names =
+        [
+            clean.Cpu!.Name, clean.Gpus[0].Name, clean.Storage[0].Name, clean.Network[0].Name,
+            clean.Volumes[0].Name, clean.Volumes[0].MountPoint, clean.Volumes[0].FileSystem, clean.TopProcesses[0].Name
+        ];
+        Assert.All(names, name => Assert.DoesNotContain(name, c => char.IsControl(c) || c == '\u202E'));
+        Assert.Equal("USB]0;pwned[2J", clean.Volumes[0].Name);
+    }
+
+    [Fact]
     public void ReadsAtLeastOneVolumeOfThisMachine()
     {
         var volumes = new VolumeReader().Read();
