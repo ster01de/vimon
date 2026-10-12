@@ -7,6 +7,8 @@ public sealed record Diagnostic(HealthLevel Level, string Code, string Message);
 public static class DiagnosticsEngine
 {
     private const double PcieWidthCheckMinLoadPct = 50;
+    // Binary gigabytes, like the RAM row and df -h.
+    private const double BytesPerGb = 1024d * 1024 * 1024;
 
     public static IReadOnlyList<Diagnostic> Evaluate(SystemSnapshot s, HealthThresholds? thresholds = null)
     {
@@ -50,11 +52,21 @@ public static class DiagnosticsEngine
         else if (s.Thermal == ThermalState.Serious)
             list.Add(new(HealthLevel.Warning, "THERMAL_SERIOUS", "System thermal state serious, throttling likely"));
 
+        foreach (var volume in s.Volumes)
+            AddByLevel(list, VolumeLevel(volume, t), "DISK_FULL", "DISK_LOW",
+                $"{volume.Name}: {volume.FreeBytes / BytesPerGb:0.0} GB free ({volume.UsedPct:0}% used)");
+
         if (list.Count == 0)
             list.Add(new(HealthLevel.Good, "HEALTHY", "No important issues detected"));
 
         return list;
     }
+
+    /// <summary>The fill level of a volume, unless it still has plenty of space in absolute terms.</summary>
+    public static HealthLevel VolumeLevel(VolumeSpace volume, HealthThresholds thresholds) =>
+        volume.FreeBytes / BytesPerGb >= HealthThresholds.VolumeFreeEnoughGb
+            ? HealthLevel.Good
+            : thresholds.VolumeUsedPct.Classify(volume.UsedPct);
 
     private static void AddByLevel(
         List<Diagnostic> list, HealthLevel level, string criticalCode, string warningCode, string message)

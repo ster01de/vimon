@@ -100,6 +100,7 @@ Not available yet: the Linux backend is planned.
 | PCIe link (generation, lanes) | NVIDIA | — |
 | RAM used | ✓ | ✓ |
 | OS memory pressure | — | ✓ |
+| Free disk space per volume | ✓ | ✓ |
 | Storage temperature | ✓ | — |
 | Network throughput (total, busiest interfaces) | ✓ ⁵ | ✓ ⁵ |
 | Busiest processes (CPU, memory) | planned | ✓ ⁶ |
@@ -123,10 +124,13 @@ The STATUS section sits at the top and lists what is worth a look right now.
 | GPU hotspot temperature | ≥ 95 °C | ≥ 105 °C |
 | GPU memory temperature | ≥ 95 °C | ≥ 105 °C |
 | RAM usage | ≥ 85 % | ≥ 95 % |
+| Disk space per volume ⁷ | ≥ 90 % used | ≥ 97 % used |
 | OS memory pressure (macOS) | warning | critical |
 | OS thermal state (macOS) | serious | critical |
 
 PCIe running narrower than supported while the GPU is above 50 % load is reported as info.
+
+⁷ not for volumes with 100 GB or more still free. On macOS the free space is what `df` reports; Finder adds purgeable space and may show more.
 
 Thresholds are conservative and the same for every machine for now. Fanless Apple Silicon laptops can run above 80 °C under sustained load by design, so expect CPU warnings there until per-machine [profiles](profiles/) are loaded.
 

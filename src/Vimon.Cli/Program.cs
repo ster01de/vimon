@@ -237,10 +237,12 @@ void SelectGpu(int index)
     history = history.WithoutGpu();
 }
 
-// --no-processes drops the names before any view sees them.
+// --no-processes drops the process names before any view sees them.
 SystemSnapshot ReadSnapshot()
 {
-    var read = telemetry.Read();
+    // Names come from sources other people control (volume labels, adapter names), so no raw
+    // escape sequence may reach the terminal.
+    var read = TerminalText.Clean(telemetry.Read());
     return cli.NoProcesses ? read with { TopProcesses = [], ProcessScope = ProcessScope.None } : read;
 }
 

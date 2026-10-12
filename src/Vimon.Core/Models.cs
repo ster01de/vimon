@@ -64,6 +64,9 @@ public sealed record SystemSnapshot(
     public IReadOnlyList<ProcessUsage> TopProcesses { get; init; } = [];
 
     public ProcessScope ProcessScope { get; init; } = ProcessScope.None;
+
+    /// <summary>Free space of the user's volumes; empty where the backend does not read them.</summary>
+    public IReadOnlyList<VolumeSpace> Volumes { get; init; } = [];
 }
 
 /// <summary>Bytes per second of one interface; null until two samples exist or after a counter reset.</summary>
