@@ -79,7 +79,7 @@ public class DashboardTests
         string output = Render(Snapshot(gpus: Gpu()));
 
         Assert.Contains(Dashboard.Missing, LineWith(output, "Hotspot"));
-        Assert.Contains("STORAGE", output);
+        Assert.Contains("DISK", output);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class DashboardTests
         Assert.DoesNotContain(Dashboard.Missing, output);
         Assert.DoesNotContain("Hotspot", output);
         Assert.DoesNotContain("PCIe", output);
-        Assert.DoesNotContain("STORAGE", output);
+        Assert.DoesNotContain("DISK", output);
         Assert.Contains("Core", output);
         Assert.Contains("(empty rows hidden)", output);
     }
@@ -169,6 +169,26 @@ public class DashboardTests
         Assert.DoesNotContain("PROCESSES", Render(Snapshot()));
         Assert.DoesNotContain("PROCESSES", Render(WithProcesses(Snapshot()), hideMissing: true));
         Assert.Contains("PROCESSES", Render(WithProcesses(Snapshot())));
+    }
+
+    [Fact]
+    public void ShowsHowFullEachVolumeIsWithTheStartupDiskFirst()
+    {
+        var snapshot = Snapshot() with
+        {
+            Volumes =
+            [
+                new VolumeSpace("TOSHIBA 1TB", "/Volumes/TOSHIBA 1TB", "ntfs", 600UL << 30, 1000UL << 30),
+                new VolumeSpace("Startup disk", "/", "apfs", (ulong)(2.7 * (1UL << 30)), 228UL << 30)
+            ]
+        };
+
+        string output = Render(snapshot);
+
+        Assert.Contains("99 %", LineWith(output, "Startup disk"));
+        Assert.Contains($"{2.7:0.0} GB free", LineWith(output, "Startup disk"));
+        Assert.Contains("ntfs", LineWith(output, "TOSHIBA"));
+        Assert.True(output.IndexOf("Startup disk", StringComparison.Ordinal) < output.IndexOf("TOSHIBA", StringComparison.Ordinal));
     }
 
     [Fact]

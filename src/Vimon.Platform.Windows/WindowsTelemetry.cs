@@ -17,6 +17,7 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
 
     private readonly NvidiaPcieProbe _nvidiaPcie = new();
     private readonly WindowsNetwork _network = new();
+    private readonly VolumeReader _volumes = new();
 
     public string PlatformName => "Windows";
 
@@ -123,7 +124,8 @@ public sealed class WindowsTelemetry : IPlatformTelemetry
             storage
         )
         {
-            Network = _network.Read()
+            Network = _network.Read(),
+            Volumes = _volumes.Read()
         };
     }
 

@@ -21,7 +21,6 @@ internal static class Dashboard
     private const int ValueWidth = 10;
     private const int BarWidth = 20;
     private const int MaxStatusRows = 3;
-    private const int MaxStorageRows = 3;
     private const int MaxNetworkInterfaces = 3;
     private const string FindingDot = "●";
 
@@ -41,7 +40,7 @@ internal static class Dashboard
                 MemoryPanel(s, t, theme),
                 ProcessesSection(s, options, theme),
                 NetworkPanel(s, history, options, theme),
-                StoragePanel(s, options, theme)
+                DiskSection(s, options, t, theme)
             }
             .OfType<IRenderable>()
             .ToList();
@@ -172,22 +171,19 @@ internal static class Dashboard
         return Section("NETWORK", subtitle: null, MetricsGrid(rows, o.HideMissing, theme), theme);
     }
 
-    /// <returns>Null when hiding missing values and no drive reports a temperature.</returns>
-    private static Panel? StoragePanel(SystemSnapshot s, DashboardOptions o, Theme theme)
+    /// <returns>Null when hiding missing values and there is neither a volume nor a drive temperature.</returns>
+    private static Panel? DiskSection(SystemSnapshot s, DashboardOptions o, HealthThresholds t, Theme theme)
     {
-        var rows = s.Storage
-            .Take(MaxStorageRows)
-            .Select(drive => (Label: drive.Name, Value: Celsius(drive.TempC)))
-            .ToList();
+        var rows = DiskPanel.Rows(s, t, theme);
 
         if (rows.Count == 0)
-            rows.Add(("Temperature", null));
+            rows.Add(("Volumes", null));
 
         if (o.HideMissing && rows.All(row => row.Value is null))
             return null;
 
-        // Drive names vary a lot in length (e.g. "Samsung SSD 980 PRO 1TB"), so the label column adapts.
-        return Section("STORAGE", subtitle: null, MetricsGrid(rows, o.HideMissing, theme, labelWidth: null), theme);
+        // Volume and drive names vary a lot in length, so the label column adapts.
+        return Section("DISK", subtitle: null, MetricsGrid(rows, o.HideMissing, theme, labelWidth: null), theme);
     }
 
     private static Panel Section(string title, string? subtitle, IRenderable content, Theme theme)
@@ -277,9 +273,6 @@ internal static class Dashboard
 
         return down is null && up is null ? null : $"↓{down ?? Missing}  ↑{up ?? Missing}";
     }
-
-    private static string? Celsius(double? value) =>
-        MetricFormat.IsPresent(value) && value > 0 ? $"{value:0.#} °C" : null;
 
     private static string? Watts(double? value) =>
         MetricFormat.IsPresent(value) && value > 0 ? $"{value:0.#} W" : null;
