@@ -4,17 +4,19 @@ internal enum ViewMode { Full, Compact, Widget }
 
 /// <summary>Command-line flags. <c>--widget</c> wins over <c>--compact</c>.</summary>
 /// <param name="Theme">The theme from <c>--theme</c>; null when none was given.</param>
-internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing, Theme? Theme = null)
+/// <param name="NoProcesses">Hide process names, e.g. while sharing the screen.</param>
+internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing, Theme? Theme = null, bool NoProcesses = false)
 {
     private const string OnceFlag = "--once";
     private const string CompactFlag = "--compact";
     private const string WidgetFlag = "--widget";
     private const string HideMissingFlag = "--hide-missing";
+    private const string NoProcessesFlag = "--no-processes";
     private const string ThemeFlag = "--theme";
     private const string ThemeAssignment = ThemeFlag + "=";
     private const string OptionPrefix = "--";
 
-    private static readonly string[] Switches = [OnceFlag, CompactFlag, WidgetFlag, HideMissingFlag];
+    private static readonly string[] Switches = [OnceFlag, CompactFlag, WidgetFlag, HideMissingFlag, NoProcessesFlag];
 
     private static string Usage => $"Options: {string.Join(", ", Switches)}, {ThemeFlag} <name>. Themes: {Cli.Theme.NameList}";
 
@@ -42,7 +44,8 @@ internal sealed record CliOptions(bool Once, ViewMode Mode, bool HideMissing, Th
             : switches.Contains(CompactFlag) ? ViewMode.Compact
             : ViewMode.Full;
 
-        return new CliOptions(switches.Contains(OnceFlag), mode, switches.Contains(HideMissingFlag), theme);
+        return new CliOptions(
+            switches.Contains(OnceFlag), mode, switches.Contains(HideMissingFlag), theme, switches.Contains(NoProcessesFlag));
     }
 
     /// <summary>The C key switches full and compact; the widget stays a widget.</summary>

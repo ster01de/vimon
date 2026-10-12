@@ -39,6 +39,7 @@ internal static class Dashboard
         var lower = new IRenderable?[]
             {
                 MemoryPanel(s, t, theme),
+                ProcessesSection(s, options, theme),
                 NetworkPanel(s, history, options, theme),
                 StoragePanel(s, options, theme)
             }
@@ -141,6 +142,12 @@ internal static class Dashboard
 
         return Section("MEMORY", subtitle: null, MetricsGrid(rows, hideMissing: false, theme), theme);
     }
+
+    /// <returns>Null when the backend reads no processes, or when hiding an empty list.</returns>
+    private static Panel? ProcessesSection(SystemSnapshot s, DashboardOptions o, Theme theme) =>
+        ProcessesPanel.Title(s) is string title && ProcessesPanel.Body(s, o.HideMissing, theme) is IRenderable body
+            ? Section(title, subtitle: null, body, theme)
+            : null;
 
     /// <returns>Null when hiding missing values and no interface reports a rate.</returns>
     private static Panel? NetworkPanel(SystemSnapshot s, MetricHistory h, DashboardOptions o, Theme theme)

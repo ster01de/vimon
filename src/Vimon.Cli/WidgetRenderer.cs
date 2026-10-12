@@ -34,6 +34,8 @@ internal static class WidgetRenderer
     private const int LoadWidth = 4;
     private const int StateLabelWidth = 10;
     private const int SparkGap = 2;
+    // " 100%" after the process name.
+    private const int TopCpuWidth = 5;
     private const int MetricWidth = LabelWidth + 1 + TempWidth + 1 + LoadWidth;
     private const int MetricWithSparkWidth = MetricWidth + SparkGap + SparkLength;
     // ShortThroughput never needs more than four characters ("999K", "1.2M").
@@ -56,6 +58,7 @@ internal static class WidgetRenderer
 
         var lines = new List<string> { StatusLine(diagnostics, options, theme) };
         lines.AddRange(FindingLines(diagnostics, options.Width, theme));
+        AddIfPresent(lines, TopProcessLine(s, diagnostics, options.Width));
         AddIfPresent(lines, MetricLine("CPU", s.Cpu?.TempC, t.CpuTempC, s.Cpu?.LoadPct, history.CpuLoadPct, hasSpark, theme));
 
         if (gpu is not null)
@@ -99,6 +102,20 @@ internal static class WidgetRenderer
                 string message = MetricFormat.Truncate(d.Message, width - prefix.Length);
                 return $"[{theme.Of(d.Level)}]{prefix}{Markup.Escape(message)}[/]";
             });
+
+    /// <returns>
+    /// The busiest process, only while the status is a warning or worse, so a healthy widget does
+    /// not flicker between process names.
+    /// </returns>
+    private static string? TopProcessLine(SystemSnapshot s, IReadOnlyList<Diagnostic> diagnostics, int width)
+    {
+        if (HealthStyle.Worst(diagnostics) < HealthLevel.Warning)
+            return null;
+
+        int nameWidth = width - LabelWidth - TopCpuWidth;
+        string? top = MetricFormat.TopProcess(s.TopProcesses, nameWidth);
+        return top is null ? null : $"{"TOP",-LabelWidth}{Markup.Escape(top)}";
+    }
 
     /// <returns>Null when neither temperature nor load is known, so the row disappears.</returns>
     private static string? MetricLine(

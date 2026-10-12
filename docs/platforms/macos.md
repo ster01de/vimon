@@ -83,6 +83,7 @@ Everything is read through public system interfaces plus read-only SMC access:
 | RAM used | Mach VM statistics, counted like Activity Monitor (app + wired + compressed) |
 | Memory pressure | `sysctl kern.memorystatus_vm_pressure_level` |
 | Thermal state | `NSProcessInfo.thermalState`, the signal macOS uses for throttling |
+| Busiest processes | `libproc` (`proc_pidinfo` with `PROC_PIDTASKALLINFO`), read every 2 s. CPU is the share of the whole Mac, like the CPU load row; Activity Monitor shows per-core values instead (100 % = one core). Memory is the resident size, which can differ from Activity Monitor's *Memory* column. Only your own processes: macOS refuses the others without root. |
 | Network throughput | Interface byte counters of the routing table (`sysctl NET_RT_IFLIST2`). macOS gives apps only the low 32 bits, rounded to 1 KB; vimon bridges the wrap every 4 GB. Left out: loopback, VPN tunnels (`utun`), AirDrop and peer-to-peer Wi-Fi (`awdl`, `llw`), Personal Hotspot (`ap`), internal bridges (`anpi`, `bridge`) |
 
 ## Not available (yet)

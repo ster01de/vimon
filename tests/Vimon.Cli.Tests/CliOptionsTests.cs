@@ -19,6 +19,13 @@ public class CliOptionsTests
     }
 
     [Fact]
+    public void ReadsNoProcesses()
+    {
+        Assert.True(CliOptions.Parse(["--no-processes"]).NoProcesses);
+        Assert.False(CliOptions.Parse([]).NoProcesses);
+    }
+
+    [Fact]
     public void WidgetWinsOverCompact()
     {
         Assert.Equal(ViewMode.Widget, CliOptions.Parse(["--compact", "--widget"]).Mode);

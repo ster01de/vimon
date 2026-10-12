@@ -13,6 +13,7 @@ internal static class CompactRenderer
     private const string Separator = " │ ";
     private const string FindingSeparator = " · ";
     private const string FindingIndent = "  ";
+    private const int TopNameWidth = 20;
 
     /// <param name="maxWidth">
     /// Live view: every line is cut or padded to exactly this width, so a shorter frame overwrites
@@ -43,7 +44,18 @@ internal static class CompactRenderer
         var lines = new List<string> { string.Join(Separator, segments) };
 
         if (findings.Count > 0)
-            lines.Add(FindingIndent + string.Join(FindingSeparator, findings.Select(f => f.Message)));
+        {
+            var notes = findings.Select(f => f.Message).ToList();
+
+            // Only when something is wrong: the busiest process is the first suspect.
+            if (HealthStyle.Worst(diagnostics) >= HealthLevel.Warning
+                && MetricFormat.TopProcess(s.TopProcesses, TopNameWidth) is string top)
+            {
+                notes.Add($"top {top}");
+            }
+
+            lines.Add(FindingIndent + string.Join(FindingSeparator, notes));
+        }
 
         var b = new StringBuilder();
         foreach (string line in lines)

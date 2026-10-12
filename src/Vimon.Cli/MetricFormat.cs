@@ -1,3 +1,5 @@
+using Vimon.Core;
+
 namespace Vimon.Cli;
 
 /// <summary>Plain-text formatting shared by the compact and widget views. Pure.</summary>
@@ -9,6 +11,9 @@ internal static class MetricFormat
     // 999.5 would round to "1000", so it already moves up to the next unit.
     private const double NextUnitAt = 999.5;
     private static readonly string[] ByteUnits = ["B", "K", "M", "G"];
+    // Memory in binary units, like the RAM row and Activity Monitor.
+    private const double Mebibyte = 1024 * 1024;
+    private const double Gibibyte = Mebibyte * 1024;
 
     public static bool IsPresent(double? value) =>
         value is double v && !double.IsNaN(v) && !double.IsInfinity(v);
@@ -40,6 +45,16 @@ internal static class MetricFormat
         var (value, unit) = ScaleBytes(bytesPerSec!.Value);
         return unit == "B" ? $"{value:0}B" : $"{Number(value)}{unit}";
     }
+
+    /// <returns>Memory such as <c>512 MB</c> or <c>4.1 GB</c>.</returns>
+    public static string Memory(ulong bytes) =>
+        bytes >= Gibibyte ? $"{bytes / Gibibyte:0.0} GB" : $"{bytes / Mebibyte:0} MB";
+
+    /// <returns>The top process as <c>Xcode 23%</c>, or null without a CPU value.</returns>
+    public static string? TopProcess(IReadOnlyList<ProcessUsage> processes, int nameWidth) =>
+        processes.Count > 0 && processes[0].CpuPct is double pct
+            ? $"{Truncate(processes[0].Name, nameWidth)} {pct:0}%"
+            : null;
 
     /// <summary>Filled cells of a bar with <paramref name="cells"/> cells; 0 for a missing or non-finite value.</summary>
     public static int FilledCells(double percent, int cells) =>

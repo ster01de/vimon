@@ -62,6 +62,17 @@ public class CompactRendererTests
     }
 
     [Fact]
+    public void NamesTheBusiestProcessOnlyWhenSomethingIsWrong()
+    {
+        ProcessUsage[] top = [new(1, "Xcode", 23.4, 1)];
+        var healthy = Snapshot() with { TopProcesses = top };
+        var hot = Snapshot(Cpu(tempC: 95, loadPct: 10)) with { TopProcesses = top };
+
+        Assert.Single(Render(healthy));
+        Assert.Equal("  CPU 95°C · top Xcode 23%", Render(hot)[1]);
+    }
+
+    [Fact]
     public void NumbersTheSelectedGpuWhenThereAreSeveral()
     {
         var lines = Render(Snapshot(null, Gpu(60, 30), Gpu(70, 90)), selectedGpu: 1);
