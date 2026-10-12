@@ -72,7 +72,7 @@ int selectedGpu = 0;
 bool running = true;
 bool paused = false;
 int frame = 0;
-int lastWidth = -1;
+bool redrawRequested = false;
 // The widget runs all day in a desktop panel, so it only redraws when there is a new sample.
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
@@ -102,26 +102,39 @@ void RunLiveView()
 
     try
     {
-        AnsiConsole.Live(new Text(""))
-            .AutoClear(true)
-            .Overflow(VerticalOverflow.Ellipsis)
-            .Cropping(VerticalOverflowCropping.Bottom)
-            .Start(context =>
-            {
-                while (running)
-                {
-                    SampleIfDue();
-                    context.UpdateTarget(BuildView());
-                    context.Refresh();
-                    WaitForKeys(redrawIntervalMs);
-                    frame++;
-                }
-            });
+        while (running)
+        {
+            SampleIfDue();
+            DrawFrame();
+            WaitForKeys(redrawIntervalMs);
+            frame++;
+        }
     }
     finally
     {
         AnsiConsole.Cursor.Show();
     }
+}
+
+// Absolute positioning (see ScreenFrame) repairs a resized window with the next frame. Without ANSI
+// support the cursor cannot be placed, so frames are simply written one after another.
+void DrawFrame()
+{
+    int width = mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth();
+    var view = BuildView(width);
+    var capabilities = AnsiConsole.Profile.Capabilities;
+
+    if (!capabilities.Ansi)
+    {
+        AnsiConsole.Write(view);
+        AnsiConsole.WriteLine();
+        return;
+    }
+
+    string rendered = ScreenFrame.Render(view, width, capabilities.ColorSystem, capabilities.Unicode);
+    Console.Out.Write(ScreenFrame.Compose(rendered, GetWindowHeight(), redrawRequested));
+    Console.Out.Flush();
+    redrawRequested = false;
 }
 
 // Sensors are read every sampleIntervalMs; the view redraws faster so the spinner animates smoothly.
@@ -138,19 +151,11 @@ void SampleIfDue()
     nextSampleAt = now + sampleIntervalMs;
 }
 
-IRenderable BuildView()
+IRenderable BuildView(int width)
 {
     var current = snapshot!;
     var gpu = GpuAt(current, selectedGpu);
     var diagnostics = DiagnosticsEngine.Evaluate(current);
-    int width = mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth();
-
-    // A narrower window re-wraps the previous frame, so start from a clean screen after a resize.
-    if (width != lastWidth)
-    {
-        AnsiConsole.Clear();
-        lastWidth = width;
-    }
 
     if (mode == ViewMode.Widget)
         return WidgetRenderer.Build(current, gpu, diagnostics, history,
@@ -169,7 +174,7 @@ void WaitForKeys(int budgetMs)
 
     while (running && Environment.TickCount64 < end)
     {
-        if (canReadKeys && Console.KeyAvailable && HandleKey(Console.ReadKey(intercept: true).Key))
+        if (canReadKeys && Console.KeyAvailable && HandleKey(Console.ReadKey(intercept: true)))
             return;
 
         Thread.Sleep(keyPollIntervalMs);
@@ -177,11 +182,20 @@ void WaitForKeys(int budgetMs)
 }
 
 // Returns true when the view should redraw right away.
-bool HandleKey(ConsoleKey key)
+bool HandleKey(ConsoleKeyInfo info)
 {
+    var key = info.Key;
+
     if (key is ConsoleKey.Q or ConsoleKey.Escape)
     {
         running = false;
+        return true;
+    }
+
+    // R or Ctrl+L (the usual terminal shortcut) wipe the screen, e.g. after another program wrote into it.
+    if (key == ConsoleKey.R || (key == ConsoleKey.L && info.Modifiers.HasFlag(ConsoleModifiers.Control)))
+    {
+        redrawRequested = true;
         return true;
     }
 
@@ -311,4 +325,11 @@ static int GetWidgetWidth()
 {
     try { return Math.Clamp(Console.WindowWidth - 1, WidgetRenderer.MinWidth, WidgetRenderer.MaxWidth); }
     catch { return WidgetRenderer.MaxWidth; }
+}
+
+// 0 when the terminal does not report a height (some pseudo-terminals), so nothing is cut.
+static int GetWindowHeight()
+{
+    try { return Math.Max(0, Console.WindowHeight); }
+    catch { return 0; }
 }

@@ -138,6 +138,7 @@ P        pause
 Space    pause
 H        hide / show rows without a value (—)
 C        switch between full and compact view
+R        redraw the screen (also Ctrl+L)
 Q / Esc  quit
 Ctrl+C   quit
 ```
@@ -153,7 +154,7 @@ Options:
 --no-processes   hide process names, e.g. while sharing your screen
 ```
 
-The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. If the window is too short, the view is cut from the bottom; STATUS always stays visible.
+The live view uses the terminal's alternate screen where the terminal supports it, like `top`: your previous terminal content comes back when you quit. From 100 columns on, panels sit side by side. Each frame is drawn from the top-left corner, so resizing the window never leaves broken pieces behind. If the window is too short, the view is cut from the bottom; STATUS always stays visible.
 
 ### Compact view
 
