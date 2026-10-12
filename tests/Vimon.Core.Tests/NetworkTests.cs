@@ -140,6 +140,23 @@ public class NetworkTotalsTests
     }
 }
 
+public class DiskTotalsTests
+{
+    [Fact]
+    public void SumsTheKnownRatesOfAllDrives()
+    {
+        StorageMetrics[] drives =
+        [
+            new("SSD", null) { ReadBytesPerSec = 1000, WriteBytesPerSec = null },
+            new("USB", null) { ReadBytesPerSec = 500, WriteBytesPerSec = 2000 },
+            new("Temp only", 40)
+        ];
+
+        Assert.Equal(((double?)1500, (double?)2000), DiskTotals.Of(drives));
+        Assert.Equal(((double?)null, (double?)null), DiskTotals.Of([new StorageMetrics("Temp only", 40)]));
+    }
+}
+
 public class NetworkInterfaceFilterTests
 {
     [Theory]

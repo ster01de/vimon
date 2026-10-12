@@ -177,12 +177,14 @@ public class WidgetRendererTests
             {
                 Thermal = ThermalState.Serious,
                 Memory = Memory with { Pressure = MemoryPressure.Warning },
-                Network = [new("en0", 999_000_000, 999_000)]
+                Network = [new("en0", 999_000_000, 999_000)],
+                Storage = [new StorageMetrics("SSD", null) { ReadBytesPerSec = 999_000_000, WriteBytesPerSec = 999_000_000 }]
             };
         var history = MetricHistory.Empty with
         {
             CpuLoadPct = [.. Enumerable.Range(0, 20).Select(i => i * 5.0)],
-            NetDownBps = [.. Enumerable.Range(0, 20).Select(i => i * 50_000.0)]
+            NetDownBps = [.. Enumerable.Range(0, 20).Select(i => i * 50_000.0)],
+            DiskWriteBps = [.. Enumerable.Range(0, 20).Select(i => i * 5_000_000.0)]
         };
 
         foreach (int width in new[] { WidgetRenderer.MinWidth, 22, WidgetRenderer.MaxWidth })
@@ -258,6 +260,22 @@ public class WidgetRendererTests
 
         int ram = Array.FindIndex(lines, line => line.StartsWith("RAM"));
         Assert.Equal($"NET ↓{1.2:0.0}M ↑310K", lines[ram + 1]);
+    }
+
+    [Fact]
+    public void ShowsDiskThroughputAsReadAndWrite()
+    {
+        var snapshot = Snapshot() with
+        {
+            Network = [new("en0", 1_200_000, 310_000)],
+            Storage = [new StorageMetrics("SSD", null) { ReadBytesPerSec = 12_000_000, WriteBytesPerSec = 110_000_000 }]
+        };
+
+        var lines = Lines(Render(snapshot));
+
+        Assert.Equal("NET ↓1.2M ↑310K".Replace(".", System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator),
+            lines.Single(l => l.StartsWith("NET")));
+        Assert.Equal("DISK R12M  W110M", lines.Single(l => l.StartsWith("DISK")));
     }
 
     [Fact]

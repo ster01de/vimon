@@ -195,6 +195,25 @@ public class DashboardTests
     }
 
     [Fact]
+    public void ShowsDiskThroughputAndTheBusiestDriveFirst()
+    {
+        StorageMetrics[] drives =
+        [
+            new("APPLE SSD", null) { ReadBytesPerSec = 1_000, WriteBytesPerSec = 0, Interconnect = "Apple Fabric", IsExternal = false },
+            new("TOSHIBA External USB 3.0", null) { ReadBytesPerSec = 0, WriteBytesPerSec = 110_000_000, Interconnect = "USB", IsExternal = true }
+        ];
+        var snapshot = new SystemSnapshot(DateTimeOffset.UnixEpoch, new CpuMetrics("Test CPU", 50, 10, 20, 3000), [], Memory, drives);
+
+        var diskLines = Lines(Render(snapshot)).SkipWhile(line => !line.Contains("DISK", StringComparison.Ordinal)).ToList();
+
+        Assert.Contains("110 MB/s", diskLines.First(line => line.Contains("Write", StringComparison.Ordinal)));
+        string toshiba = diskLines.First(line => line.Contains("TOSHIBA", StringComparison.Ordinal));
+        Assert.Contains("W 110 MB/s", toshiba);
+        Assert.Contains("USB external", toshiba);
+        Assert.True(diskLines.FindIndex(l => l.Contains("TOSHIBA")) < diskLines.FindIndex(l => l.Contains("APPLE SSD")));
+    }
+
+    [Fact]
     public void ShowsGpuMemoryUsedAndTotal()
     {
         string output = Render(Snapshot(gpus: Gpu(memoryUsedGb: 1.5, memoryTotalGb: 24)));

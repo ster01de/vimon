@@ -73,6 +73,15 @@ public class CompactRendererTests
     }
 
     [Fact]
+    public void AddsDiskThroughputAsReadAndWrite()
+    {
+        var snapshot = new SystemSnapshot(DateTimeOffset.UnixEpoch, Cpu(50, 10), [], Memory,
+            [new StorageMetrics("SSD", null) { ReadBytesPerSec = 12_000_000, WriteBytesPerSec = 110_000_000 }]);
+
+        Assert.Equal(new[] { "OK │ CPU 50°C 10% │ RAM 25% │ DISK R12M W110M" }, Render(snapshot));
+    }
+
+    [Fact]
     public void NumbersTheSelectedGpuWhenThereAreSeveral()
     {
         var lines = Render(Snapshot(null, Gpu(60, 30), Gpu(70, 90)), selectedGpu: 1);

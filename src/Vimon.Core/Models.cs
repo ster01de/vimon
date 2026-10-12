@@ -44,7 +44,18 @@ public sealed record MemoryMetrics(
 
 public enum MemoryPressure { Normal, Warning, Critical }
 
-public sealed record StorageMetrics(string Name, double? TempC);
+public sealed record StorageMetrics(string Name, double? TempC)
+{
+    /// <summary>Bytes per second; null until two samples exist or where the platform reports none.</summary>
+    public double? ReadBytesPerSec { get; init; }
+
+    public double? WriteBytesPerSec { get; init; }
+
+    /// <summary>How the drive is attached, as the OS names it: USB, PCI-Express, Apple Fabric, Thunderbolt…</summary>
+    public string? Interconnect { get; init; }
+
+    public bool? IsExternal { get; init; }
+}
 
 public sealed record SystemSnapshot(
     DateTimeOffset Timestamp,

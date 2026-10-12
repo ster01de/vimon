@@ -17,6 +17,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
     private readonly MacNetwork _network = new();
     private readonly MacProcesses _processes = new();
     private readonly VolumeReader _volumes = new();
+    private readonly MacDisks _disks = new();
     private CpuLoadInfo? _previousCpuTicks;
     private double? _lastCpuLoadPct;
 
@@ -44,7 +45,7 @@ public sealed class MacTelemetry : IPlatformTelemetry
             ReadCpu(temperatures.CpuC),
             WithGpuTemperatures(MacGpuReader.Read(), temperatures),
             _memory.Read(),
-            [])
+            _disks.Read())
         {
             Thermal = _thermal.Read(),
             Network = _network.Read(),

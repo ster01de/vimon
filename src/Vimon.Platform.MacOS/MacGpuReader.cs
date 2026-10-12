@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Text;
 using Vimon.Core;
 using static Vimon.Platform.MacOS.MacNative;
 
@@ -13,7 +11,6 @@ namespace Vimon.Platform.MacOS;
 internal static class MacGpuReader
 {
     private const uint MainPortDefault = 0;
-    private const int MaxNameBytes = 256;
     private const double BytesPerGb = 1024d * 1024d * 1024d;
 
     public static IReadOnlyList<GpuMetrics> Read()
@@ -75,7 +72,7 @@ internal static class MacGpuReader
         double? utilizationPct = null;
         double? memoryUsedBytes = null;
 
-        IntPtr stats = CopyProperty(entry, "PerformanceStatistics");
+        IntPtr stats = MacRegistry.CopyProperty(entry, "PerformanceStatistics");
 
         if (stats != IntPtr.Zero)
         {
@@ -83,8 +80,8 @@ internal static class MacGpuReader
             {
                 if (CFGetTypeID(stats) == CFDictionaryGetTypeID())
                 {
-                    utilizationPct = DictionaryNumber(stats, "Device Utilization %");
-                    memoryUsedBytes = DictionaryNumber(stats, "In use system memory");
+                    utilizationPct = MacRegistry.DictionaryNumber(stats, "Device Utilization %");
+                    memoryUsedBytes = MacRegistry.DictionaryNumber(stats, "In use system memory");
                 }
             }
             finally
@@ -107,7 +104,7 @@ internal static class MacGpuReader
     /// <summary>Apple Silicon exposes "model" on the accelerator; discrete GPUs on its PCI parent.</summary>
     private static string? ReadModel(uint entry)
     {
-        string? model = ReadStringProperty(entry, "model");
+        string? model = MacRegistry.ReadStringProperty(entry, "model");
 
         if (model is not null)
             return model;
@@ -117,100 +114,11 @@ internal static class MacGpuReader
 
         try
         {
-            return ReadStringProperty(parent, "model");
+            return MacRegistry.ReadStringProperty(parent, "model");
         }
         finally
         {
             IOObjectRelease(parent);
         }
-    }
-
-    private static string? ReadStringProperty(uint entry, string key)
-    {
-        IntPtr value = CopyProperty(entry, key);
-
-        if (value == IntPtr.Zero)
-            return null;
-
-        try
-        {
-            nuint type = CFGetTypeID(value);
-
-            if (type == CFStringGetTypeID())
-            {
-                var buffer = new byte[MaxNameBytes];
-                return CFStringGetCString(value, buffer, buffer.Length, CFStringEncodingUtf8)
-                    ? DecodeNullTerminated(buffer)
-                    : null;
-            }
-
-            if (type == CFDataGetTypeID())
-            {
-                int length = (int)Math.Min(CFDataGetLength(value), MaxNameBytes);
-
-                if (length <= 0)
-                    return null;
-
-                var bytes = new byte[length];
-                Marshal.Copy(CFDataGetBytePtr(value), bytes, 0, length);
-                return DecodeNullTerminated(bytes);
-            }
-
-            return null;
-        }
-        finally
-        {
-            CFRelease(value);
-        }
-    }
-
-    /// <returns>An owned CF object (caller releases), or <see cref="IntPtr.Zero"/>.</returns>
-    private static IntPtr CopyProperty(uint entry, string key)
-    {
-        IntPtr cfKey = CFStringCreateWithCString(IntPtr.Zero, key, CFStringEncodingUtf8);
-
-        if (cfKey == IntPtr.Zero)
-            return IntPtr.Zero;
-
-        try
-        {
-            return IORegistryEntryCreateCFProperty(entry, cfKey, IntPtr.Zero, 0);
-        }
-        finally
-        {
-            CFRelease(cfKey);
-        }
-    }
-
-    private static double? DictionaryNumber(IntPtr dictionary, string key)
-    {
-        IntPtr cfKey = CFStringCreateWithCString(IntPtr.Zero, key, CFStringEncodingUtf8);
-
-        if (cfKey == IntPtr.Zero)
-            return null;
-
-        try
-        {
-            // Borrowed reference: owned by the dictionary, must not be released.
-            IntPtr value = CFDictionaryGetValue(dictionary, cfKey);
-
-            if (value == IntPtr.Zero || CFGetTypeID(value) != CFNumberGetTypeID())
-                return null;
-
-            // A false result only signals a lossy conversion; the value is still the closest double.
-            CFNumberGetValue(value, CFNumberDoubleType, out double number);
-            return number;
-        }
-        finally
-        {
-            CFRelease(cfKey);
-        }
-    }
-
-    private static string? DecodeNullTerminated(byte[] bytes)
-    {
-        int end = Array.IndexOf(bytes, (byte)0);
-        string text = Encoding.UTF8.GetString(bytes, 0, end < 0 ? bytes.Length : end).Trim();
-        return text.Length == 0 ? null : text;
     }
 }
