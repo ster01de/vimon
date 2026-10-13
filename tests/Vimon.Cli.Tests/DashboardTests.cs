@@ -118,9 +118,9 @@ public class DashboardTests
     }
 
     [Fact]
-    public void ShowsNetworkTotalsAndTheBusiestInterfaceFirst()
+    public void ShowsNetworkTotalsAndListsInterfacesByNameNotByTraffic()
     {
-        var snapshot = Snapshot() with { Network = [new("en7", 2_000, 1_000), new("en0", 1_200_000, 310_000)] };
+        var snapshot = Snapshot() with { Network = [new("en7", 1_200_000, 310_000), new("en0", 2_000, 1_000)] };
 
         string output = Render(snapshot);
 
@@ -187,15 +187,15 @@ public class DashboardTests
 
         // STATUS names the full disk too; the DISK panel comes after it.
         var diskLines = Lines(output).SkipWhile(line => !line.Contains("DISK", StringComparison.Ordinal)).ToList();
-        string startup = diskLines.First(line => line.Contains("Startup disk", StringComparison.Ordinal));
+        string startup = diskLines.First(line => line.Contains("Startup", StringComparison.Ordinal));
         Assert.Contains("99 %", startup);
         Assert.Contains($"{2.7:0.0} GB free", startup);
         Assert.Contains("ntfs", diskLines.First(line => line.Contains("TOSHIBA", StringComparison.Ordinal)));
-        Assert.True(diskLines.FindIndex(l => l.Contains("Startup disk")) < diskLines.FindIndex(l => l.Contains("TOSHIBA")));
+        Assert.True(diskLines.FindIndex(l => l.Contains("Startup")) < diskLines.FindIndex(l => l.Contains("TOSHIBA")));
     }
 
     [Fact]
-    public void ShowsDiskThroughputAndTheBusiestDriveFirst()
+    public void ShowsDiskThroughputWithTheUsbLinkInTheDriveRow()
     {
         StorageMetrics[] drives =
         [
@@ -212,10 +212,10 @@ public class DashboardTests
         Assert.Contains("110 MB/s", diskLines.First(line => line.Contains("Write", StringComparison.Ordinal)));
         string toshiba = diskLines.First(line => line.Contains("TOSHIBA", StringComparison.Ordinal));
         Assert.Contains("W 110 MB/s", toshiba);
-        Assert.Contains("USB external", toshiba);
-        int toshibaRow = diskLines.FindIndex(l => l.Contains("TOSHIBA"));
-        Assert.Contains("↳ USB 3.2 Gen 1 · 5 Gb/s", diskLines[toshibaRow + 1]);
-        Assert.True(diskLines.FindIndex(l => l.Contains("TOSHIBA")) < diskLines.FindIndex(l => l.Contains("APPLE SSD")));
+        Assert.Contains("USB 5 Gb/s", toshiba);
+        Assert.Contains("internal", diskLines.First(line => line.Contains("APPLE SSD", StringComparison.Ordinal)));
+        // By name, so a copy starting on one drive does not swap the rows.
+        Assert.True(diskLines.FindIndex(l => l.Contains("APPLE SSD")) < diskLines.FindIndex(l => l.Contains("TOSHIBA")));
     }
 
     [Fact]
@@ -224,13 +224,14 @@ public class DashboardTests
         var snapshot = new SystemSnapshot(DateTimeOffset.UnixEpoch, new CpuMetrics("Test CPU", 50, 10, 20, 3000), [], Memory,
             [new StorageMetrics("SSD", null) { ReadBytesPerSec = 0, WriteBytesPerSec = 110_000_000 }])
         {
-            TopDiskProcesses = [new ProcessUsage(9, "Finder", 1, 0) { DiskReadBytesPerSec = 0, DiskWriteBytesPerSec = 110_000_000 }]
+            TopDiskProcesses = [new ProcessUsage(9, "Finder", 1, 0) { DiskReadBytesPerSec = 0, DiskWriteBytesPerSec = 110_000_000 }],
+            ProcessScope = ProcessScope.CurrentUser
         };
 
         string busiest = LineWith(Render(snapshot), "Busiest");
 
-        Assert.Contains("Finder  W 110 MB/s", busiest);
-        Assert.DoesNotContain("R ", busiest.Replace("Busiest", ""));
+        Assert.Contains("Finder", busiest);
+        Assert.Contains("R    0 B/s W 110 MB/s", busiest);
     }
 
     [Fact]

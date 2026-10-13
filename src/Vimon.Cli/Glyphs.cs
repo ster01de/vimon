@@ -2,15 +2,15 @@ namespace Vimon.Cli;
 
 /// <summary>
 /// The symbols vimon draws itself. The classic Windows console (conhost) uses fonts such as
-/// Consolas that lack block eighths, braille and some arrows, and shows them as '?'. There the safe
+/// Consolas that lack block eighths and some symbols, and shows them as '?'. There the safe
 /// set uses plain ASCII; Spectre swaps its spinner and rounded borders on its own once Unicode is
 /// switched off.
 /// </summary>
-internal sealed record Glyphs(string SparkBlocks, string Bullet, string Branch, char BarFull, char BarEmpty)
+internal sealed record Glyphs(string SparkBlocks, string Bullet, char BarFull, char BarEmpty)
 {
-    public static readonly Glyphs Unicode = new("▁▂▃▄▅▆▇█", "●", "↳", '█', '░');
+    public static readonly Glyphs Unicode = new("▁▂▃▄▅▆▇█", "●", '█', '░');
 
-    public static readonly Glyphs Safe = new("_.-:=+*#", "*", "->", '#', '.');
+    public static readonly Glyphs Safe = new("_.-:=+*#", "*", '#', '.');
 
     /// <summary>Maps a sparkline drawn with <see cref="Unicode"/> blocks onto this set.</summary>
     public string Spark(string unicodeBlocks)

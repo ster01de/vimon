@@ -36,12 +36,13 @@ public class GlyphsTests
         console.Profile.Capabilities.Unicode = false;
 
         console.Write(Dashboard.Build(snapshot, null, DiagnosticsEngine.Evaluate(snapshot), 0, history,
-            new DashboardOptions(80, Theme: Theme.Default with { Glyphs = Glyphs.Safe })));
+            new DashboardOptions(80, Clock: "14:02:11", Theme: Theme.Default with { Glyphs = Glyphs.Safe })));
 
         string output = console.Output;
         foreach (string missing in new[] { "●", "▁", "▅", "█", "░", "↳", "╭", "╰" })
             Assert.DoesNotContain(missing, output);
         Assert.Contains("* CPU 95°C", output);
-        Assert.Contains("-> USB 2.0", output);
+        Assert.Contains("USB 480 Mb/s", output);
+        Assert.Contains("* LIVE 14:02:11", output);
     }
 }

@@ -5,6 +5,9 @@ namespace Vimon.Cli;
 /// <summary>Plain-text formatting shared by the compact and widget views. Pure.</summary>
 internal static class MetricFormat
 {
+    /// <summary>"999 KB/s", "1.2 MB/s": the longest <see cref="Throughput"/> text below 1000 GB/s.</summary>
+    public const int ThroughputWidth = 8;
+
     private const string Ellipsis = "…";
     // Decimal units like Activity Monitor and Task Manager's network graphs.
     private const double UnitStep = 1000;
@@ -94,6 +97,9 @@ internal static class MetricFormat
 
         return text[..keep] + Ellipsis;
     }
+
+    /// <summary>Right-aligned in exactly <paramref name="width"/> cells, so a new unit or digit moves nothing after it.</summary>
+    public static string AlignRight(string text, int width) => Truncate(text, width).PadLeft(width);
 
     /// <summary>Cuts or pads to exactly <paramref name="width"/>; a width of 0 or less leaves the line as it is.</summary>
     public static string Fit(string line, int width) =>

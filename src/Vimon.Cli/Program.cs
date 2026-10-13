@@ -71,17 +71,14 @@ if (cli.Once)
 int selectedGpu = 0;
 bool running = true;
 bool paused = false;
-int frame = 0;
 bool redrawRequested = false;
+(int Width, int Height) drawnSize = (0, 0);
 // The widget runs all day in a desktop panel, so it only redraws when there is a new sample.
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
 var history = MetricHistory.Empty;
 SystemSnapshot? snapshot = null;
 long nextSampleAt = 0;
-IReadOnlyList<string> spinner = AnsiConsole.Profile.Capabilities.Unicode
-    ? Spinner.Known.Dots.Frames
-    : ["|", "/", "-", "\\"];
 
 // Ctrl+C ends the loop normally so the alternate screen, cursor and sensors are restored and disposed.
 Console.CancelKeyPress += (_, e) =>
@@ -102,12 +99,17 @@ void RunLiveView()
 
     try
     {
+        // The view only changes with a new sample, a key or a resized window, so other frames are skipped.
+        bool changed = true;
+
         while (running)
         {
-            SampleIfDue();
-            DrawFrame();
-            WaitForKeys(redrawIntervalMs);
-            frame++;
+            changed |= SampleIfDue();
+
+            if (changed || CurrentSize() != drawnSize)
+                DrawFrame();
+
+            changed = WaitForKeys(redrawIntervalMs);
         }
     }
     finally
@@ -118,9 +120,12 @@ void RunLiveView()
 
 // Absolute positioning (see ScreenFrame) repairs a resized window with the next frame. Without ANSI
 // support the cursor cannot be placed, so frames are simply written one after another.
+(int Width, int Height) CurrentSize() => (mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth(), GetWindowHeight());
+
 void DrawFrame()
 {
-    int width = mode == ViewMode.Widget ? GetWidgetWidth() : GetSafeWidth();
+    drawnSize = CurrentSize();
+    int width = drawnSize.Width;
     var view = BuildView(width);
     var capabilities = AnsiConsole.Profile.Capabilities;
 
@@ -132,23 +137,25 @@ void DrawFrame()
     }
 
     string rendered = ScreenFrame.Render(view, width, capabilities.ColorSystem, capabilities.Unicode);
-    Console.Out.Write(ScreenFrame.Compose(rendered, GetWindowHeight(), redrawRequested));
+    Console.Out.Write(ScreenFrame.Compose(rendered, drawnSize.Height, redrawRequested));
     Console.Out.Flush();
     redrawRequested = false;
 }
 
-// Sensors are read every sampleIntervalMs; the view redraws faster so the spinner animates smoothly.
-void SampleIfDue()
+// Sensors are read every sampleIntervalMs; keys and window size are checked more often so they show quickly.
+// Returns true when there is a new sample.
+bool SampleIfDue()
 {
     long now = Environment.TickCount64;
 
     if (snapshot is not null && (paused || now < nextSampleAt))
-        return;
+        return false;
 
     snapshot = ReadSnapshot();
     selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
     history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
     nextSampleAt = now + sampleIntervalMs;
+    return true;
 }
 
 IRenderable BuildView(int width)
@@ -157,28 +164,32 @@ IRenderable BuildView(int width)
     var gpu = GpuAt(current, selectedGpu);
     var diagnostics = DiagnosticsEngine.Evaluate(current);
 
+    string clock = current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture);
+
     if (mode == ViewMode.Widget)
-        return WidgetRenderer.Build(current, gpu, diagnostics, history,
-            new WidgetOptions(width, current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture), theme));
+        return WidgetRenderer.Build(current, gpu, diagnostics, history, new WidgetOptions(width, clock, theme));
 
     if (mode == ViewMode.Compact)
         return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
 
-    var options = new DashboardOptions(width, hideMissing, spinner[frame % spinner.Count], paused, theme);
+    var options = new DashboardOptions(width, hideMissing, clock, paused, theme);
     return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
 }
 
-void WaitForKeys(int budgetMs)
+// Returns true when a key changed the view.
+bool WaitForKeys(int budgetMs)
 {
     long end = Environment.TickCount64 + budgetMs;
 
     while (running && Environment.TickCount64 < end)
     {
         if (canReadKeys && Console.KeyAvailable && HandleKey(Console.ReadKey(intercept: true)))
-            return;
+            return true;
 
         Thread.Sleep(keyPollIntervalMs);
     }
+
+    return false;
 }
 
 // Returns true when the view should redraw right away.
@@ -285,7 +296,7 @@ static Theme ApplyTheme(Theme? requested)
 }
 
 // The classic Windows console shows symbols its font lacks as '?'. Switching Spectre's Unicode
-// capability off makes it use an ASCII spinner and square borders; vimon's own symbols follow.
+// capability off makes it use square borders; vimon's own symbols follow.
 static Theme ApplyGlyphs(Theme theme, bool asciiRequested)
 {
     bool legacyConsole = Glyphs.IsLegacyWindowsConsole(
