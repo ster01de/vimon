@@ -63,12 +63,12 @@ The binary is not code-signed yet, so SmartScreen may warn on first start (*More
 ### macOS
 
 ```bash
-curl -fLO https://github.com/ster01de/vimon/releases/download/v0.7.1-alpha/vimon-macos-arm64.tar.gz
+curl -fLO https://github.com/ster01de/vimon/releases/download/v0.8.0-alpha/vimon-macos-arm64.tar.gz
 tar -xzf vimon-macos-arm64.tar.gz
 ./vimon
 ```
 
-Newer version on the [releases page](https://github.com/ster01de/vimon/releases)? Replace `v0.7.1-alpha` in the URL. `-f` makes `curl` stop on a wrong URL instead of saving GitHub's "Not Found" page, which `tar` would reject with *Unrecognized archive format*.
+Newer version on the [releases page](https://github.com/ster01de/vimon/releases)? Replace `v0.8.0-alpha` in the URL. `-f` makes `curl` stop on a wrong URL instead of saving GitHub's "Not Found" page, which `tar` would reject with *Unrecognized archive format*.
 
 Use `vimon-macos-x64.tar.gz` on Intel Macs. Downloaded with a browser instead of `curl`? Run `xattr -d com.apple.quarantine vimon` once, because the binaries are not notarized yet.
 
@@ -274,6 +274,7 @@ GPU data uses a vendor-neutral model. Unsupported metrics are nullable by design
 - **v0.6.0-alpha** `--theme` (default, mono, high-contrast) and `NO_COLOR`, busiest processes on macOS, `--no-processes`
 - **v0.7.0-alpha** DISK panel: free space with `DISK_LOW`/`DISK_FULL`, throughput per drive, USB link speed (USB 3.2 names), busiest disk process on macOS; resize-proof live view (`R` / `Ctrl+L` redraw)
 - **v0.7.1-alpha** readable symbols in the classic Windows console (ASCII fallback instead of `?`), `--ascii`
+- **v0.8.0-alpha** a still live view: equal panel pairs, fixed rows and columns, stable order, USB link in the drive row, `● LIVE` clock instead of the spinner
 
 ### Next
 
