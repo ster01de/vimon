@@ -11,7 +11,8 @@ namespace Vimon.Platform.MacOS;
 internal sealed class MacProcesses
 {
     public const int TopCount = 5;
-    public const int TopDiskCount = 2;
+    // More than the one row shown, so the view can keep its busiest process while another briefly leads.
+    public const int TopDiskCount = 5;
 
     private const int PidHeadroom = 64;
     private static readonly TimeSpan SampleInterval = TimeSpan.FromSeconds(2);
