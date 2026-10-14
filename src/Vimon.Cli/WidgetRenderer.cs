@@ -57,16 +57,19 @@ internal static class WidgetRenderer
         var lines = new List<string> { StatusLine(diagnostics, options, theme) };
         lines.AddRange(FindingLines(diagnostics, options.Width, theme));
         AddIfPresent(lines, TopProcessLine(s, diagnostics, options.Width));
-        AddIfPresent(lines, MetricLine("CPU", s.Cpu?.TempC, t.CpuTempC, s.Cpu?.LoadPct, history.CpuLoadPct, hasSpark, theme));
+        var bands = history.Bands;
+        AddIfPresent(lines, MetricLine(
+            "CPU", s.Cpu?.TempC, t.CpuTempC, s.Cpu?.LoadPct, history.CpuLoadPct, bands.CpuLoadPct, hasSpark, theme));
 
         if (gpu is not null)
-            AddIfPresent(lines, MetricLine("GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, hasSpark, theme));
+            AddIfPresent(lines, MetricLine(
+                "GPU", gpu.CoreTempC, t.GpuCoreTempC, gpu.UtilizationPct, history.GpuLoadPct, bands.GpuLoadPct, hasSpark, theme));
 
         lines.Add(MemoryLine(s.Memory, t, hasSpark, theme));
         var (down, up) = NetworkTotals.Of(s.Network);
-        AddIfPresent(lines, ThroughputLine("NET", ("↓", down), ("↑", up), history.NetDownBps, options.Width, theme));
+        AddIfPresent(lines, ThroughputLine("NET", ("↓", down), ("↑", up), history.NetDownBps, bands.NetDownBps, options.Width, theme));
         var (read, write) = DiskTotals.Of(s.Storage);
-        AddIfPresent(lines, ThroughputLine("DISK", ("R", read), ("W", write), history.DiskWriteBps, options.Width, theme));
+        AddIfPresent(lines, ThroughputLine("DISK", ("R", read), ("W", write), history.DiskWriteBps, bands.DiskWriteBps, options.Width, theme));
 
         if (s.Memory.Pressure is MemoryPressure pressure)
             lines.Add(StateLine("Pressure", pressure.ToString(), theme.Of(HealthStyle.LevelOf(pressure)), options.Width, theme));
@@ -120,7 +123,14 @@ internal static class WidgetRenderer
 
     /// <returns>Null when neither temperature nor load is known, so the row disappears.</returns>
     private static string? MetricLine(
-        string label, double? tempC, Threshold threshold, double? loadPct, IReadOnlyList<double> loadHistory, bool hasSpark, Theme theme)
+        string label,
+        double? tempC,
+        Threshold threshold,
+        double? loadPct,
+        IReadOnlyList<double> loadHistory,
+        ScaleBand? loadBand,
+        bool hasSpark,
+        Theme theme)
     {
         string? temp = MetricFormat.ShortTemperature(tempC);
         string? load = MetricFormat.ShortPercent(loadPct);
@@ -132,7 +142,7 @@ internal static class WidgetRenderer
             ? new string(' ', TempWidth)
             : $"[{theme.Of(threshold.Classify(tempC!.Value))}]{temp,TempWidth}[/]";
         string spark = hasSpark && load is not null
-            ? Spark(Sparkline.ForLoad(loadHistory.TakeLast(SparkLength).ToList()), theme)
+            ? Spark(Sparkline.ForLoad(loadHistory.TakeLast(SparkLength).ToList(), loadBand), theme)
             : "";
 
         return $"{label,-LabelWidth} {tempCell} {load ?? "",LoadWidth}{spark}";
@@ -154,6 +164,7 @@ internal static class WidgetRenderer
         (string Mark, double? BytesPerSec) first,
         (string Mark, double? BytesPerSec) second,
         IReadOnlyList<double> history,
+        ScaleBand? band,
         int width,
         Theme theme)
     {
@@ -168,7 +179,7 @@ internal static class WidgetRenderer
                         $"{second.Mark}{secondText ?? "",-ThroughputWidth}";
         bool hasSpark = history.Count > 0 && width >= values.Length + SparkGap + SparkLength;
 
-        return hasSpark ? values + Spark(Sparkline.ForThroughput(history.TakeLast(SparkLength).ToList()), theme) : values;
+        return hasSpark ? values + Spark(Sparkline.ForThroughput(history.TakeLast(SparkLength).ToList(), band), theme) : values;
     }
 
     private static string StateLine(string label, string state, string color, int width, Theme theme)

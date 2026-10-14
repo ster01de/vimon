@@ -113,8 +113,8 @@ internal static class Dashboard
         var cpu = s.Cpu;
         var rows = new List<(string Label, string? Value)>
         {
-            ("Temp", Temperature(cpu?.TempC, t.CpuTempC, h.CpuTempC, theme)),
-            ("Load", Percent(cpu?.LoadPct, h.CpuLoadPct, theme)),
+            ("Temp", Temperature(cpu?.TempC, t.CpuTempC, h.CpuTempC, h.Bands.CpuTempC, theme)),
+            ("Load", Percent(cpu?.LoadPct, h.CpuLoadPct, h.Bands.CpuLoadPct, theme)),
             ("Power", Watts(cpu?.PackagePowerW))
         };
 
@@ -134,13 +134,13 @@ internal static class Dashboard
 
         var rows = new List<(string Label, string? Value)>
         {
-            ("Core", Temperature(gpu.CoreTempC, t.GpuCoreTempC, h.GpuTempC, theme)),
-            ("Hotspot", Temperature(gpu.HotspotTempC, t.GpuHotspotTempC, null, theme)),
-            ("VRAM temp", Temperature(gpu.MemoryTempC, t.GpuMemoryTempC, null, theme)),
-            ("Load", Percent(gpu.UtilizationPct, h.GpuLoadPct, theme)),
+            ("Core", Temperature(gpu.CoreTempC, t.GpuCoreTempC, h.GpuTempC, h.Bands.GpuTempC, theme)),
+            ("Hotspot", Temperature(gpu.HotspotTempC, t.GpuHotspotTempC, null, null, theme)),
+            ("VRAM temp", Temperature(gpu.MemoryTempC, t.GpuMemoryTempC, null, null, theme)),
+            ("Load", Percent(gpu.UtilizationPct, h.GpuLoadPct, h.Bands.GpuLoadPct, theme)),
             ("Memory", GpuMemory(gpu, theme)),
             ("Power", Watts(gpu.PowerW)),
-            ("Fan", Percent(gpu.FanPct, null, theme)),
+            ("Fan", Percent(gpu.FanPct, null, null, theme)),
             ("PCIe", Pcie(gpu, theme))
         };
 
@@ -175,8 +175,8 @@ internal static class Dashboard
         var (down, up) = NetworkTotals.Of(s.Network);
         var rows = new List<(string Label, string? Value)>
         {
-            ("Down", Rate(down, h.NetDownBps, theme)),
-            ("Up", Rate(up, h.NetUpBps, theme))
+            ("Down", Rate(down, h.NetDownBps, h.Bands.NetDownBps, theme)),
+            ("Up", Rate(up, h.NetUpBps, h.Bands.NetUpBps, theme))
         };
 
         // By name, not by traffic, so rows keep their place while the traffic shifts.
@@ -235,25 +235,26 @@ internal static class Dashboard
     }
 
     // Values are right-aligned in a fixed column; a null history means the row has no curve.
-    private static string? Temperature(double? value, Threshold threshold, IReadOnlyList<double>? history, Theme theme)
+    private static string? Temperature(
+        double? value, Threshold threshold, IReadOnlyList<double>? history, ScaleBand? band, Theme theme)
     {
         if (!MetricFormat.IsPresent(value) || value <= 0)
             return null;
 
         string text = MetricFormat.AlignRight($"{value:0.#} °C", ValueWidth);
         string color = theme.Of(threshold.Classify(value!.Value));
-        return $"[{color}]{text}[/]{Spark(history, Sparkline.ForTemperature, theme)}";
+        return $"[{color}]{text}[/]{Spark(history, band, Sparkline.ForTemperature, theme)}";
     }
 
-    private static string? Percent(double? value, IReadOnlyList<double>? history, Theme theme) =>
+    private static string? Percent(double? value, IReadOnlyList<double>? history, ScaleBand? band, Theme theme) =>
         MetricFormat.IsPresent(value)
-            ? $"{MetricFormat.AlignRight($"{value:0.#} %", ValueWidth)}{Spark(history, Sparkline.ForLoad, theme)}"
+            ? $"{MetricFormat.AlignRight($"{value:0.#} %", ValueWidth)}{Spark(history, band, Sparkline.ForLoad, theme)}"
             : null;
 
     /// <summary>A throughput row with its curve; shared with the DISK panel.</summary>
-    internal static string? Rate(double? bytesPerSec, IReadOnlyList<double> history, Theme theme) =>
+    internal static string? Rate(double? bytesPerSec, IReadOnlyList<double> history, ScaleBand? band, Theme theme) =>
         MetricFormat.Throughput(bytesPerSec) is string text
-            ? $"{MetricFormat.AlignRight(text, ValueWidth)}{Spark(history, Sparkline.ForThroughput, theme)}"
+            ? $"{MetricFormat.AlignRight(text, ValueWidth)}{Spark(history, band, Sparkline.ForThroughput, theme)}"
             : null;
 
     private static string? InterfaceRates(InterfaceRate rate)
@@ -293,10 +294,11 @@ internal static class Dashboard
     }
 
     /// <summary>A curve of fixed length, blank until samples arrive, so the row never grows.</summary>
-    private static string Spark(IReadOnlyList<double>? history, Func<IReadOnlyList<double>, string> render, Theme theme) =>
+    private static string Spark(
+        IReadOnlyList<double>? history, ScaleBand? band, Func<IReadOnlyList<double>, ScaleBand?, string> render, Theme theme) =>
         history is null
             ? ""
-            : $" [{theme.Accent}]{theme.Glyphs.Spark(Sparkline.Fixed(render(history), SparkLength))}[/]";
+            : $" [{theme.Accent}]{theme.Glyphs.Spark(Sparkline.Fixed(render(history, band), SparkLength))}[/]";
 
     private static string Bar(double percent, string color, Theme theme)
     {

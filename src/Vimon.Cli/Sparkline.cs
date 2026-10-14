@@ -12,11 +12,16 @@ internal static class Sparkline
     // 64 KB/s: background chatter on an idle link stays a flat line.
     private const double ThroughputMinSpanBps = 64_000;
 
-    public static string ForTemperature(IReadOnlyList<double> values) => Fitted(values, TempMinSpanC, TempMaxC);
+    // A band (see ScaleBand) keeps the scale from jumping when a peak leaves the window; without one,
+    // the scale fits the values alone.
+    public static string ForTemperature(IReadOnlyList<double> values, ScaleBand? band = null) =>
+        Fitted(values, band, TempMinSpanC, TempMaxC);
 
-    public static string ForLoad(IReadOnlyList<double> values) => Fitted(values, LoadMinSpanPct, LoadMaxPct);
+    public static string ForLoad(IReadOnlyList<double> values, ScaleBand? band = null) =>
+        Fitted(values, band, LoadMinSpanPct, LoadMaxPct);
 
-    public static string ForThroughput(IReadOnlyList<double> values) => Fitted(values, ThroughputMinSpanBps, double.MaxValue);
+    public static string ForThroughput(IReadOnlyList<double> values, ScaleBand? band = null) =>
+        Fitted(values, band, ThroughputMinSpanBps, double.MaxValue);
 
     /// <summary>Values outside <paramref name="min"/>..<paramref name="max"/> are clamped to the edges.</summary>
     public static string Render(IReadOnlyList<double> values, double min, double max)
@@ -39,13 +44,16 @@ internal static class Sparkline
     /// <paramref name="minSpan"/> (so sensor noise is not blown up) and never outside the bounds.
     /// </summary>
     public static (double Min, double Max) Scale(
-        IReadOnlyList<double> values, double minSpan, double lowerBound, double upperBound)
-    {
-        if (values.Count == 0)
-            return (lowerBound, upperBound);
+        IReadOnlyList<double> values, double minSpan, double lowerBound, double upperBound) =>
+        values.Count == 0
+            ? (lowerBound, upperBound)
+            : Scale(new ScaleBand(values.Min(), values.Max()), minSpan, lowerBound, upperBound);
 
-        double low = values.Min();
-        double high = values.Max();
+    /// <summary>Like <see cref="Scale(IReadOnlyList{double}, double, double, double)"/>, for a known value range.</summary>
+    public static (double Min, double Max) Scale(ScaleBand range, double minSpan, double lowerBound, double upperBound)
+    {
+        double low = range.Low;
+        double high = range.High;
         double span = Math.Max(high - low, minSpan);
         double center = (low + high) / 2;
 
@@ -54,9 +62,11 @@ internal static class Sparkline
         return (Math.Max(lowerBound, max - span), max);
     }
 
-    private static string Fitted(IReadOnlyList<double> values, double minSpan, double upperBound)
+    private static string Fitted(IReadOnlyList<double> values, ScaleBand? band, double minSpan, double upperBound)
     {
-        var (min, max) = Scale(values, minSpan, lowerBound: 0, upperBound);
+        var (min, max) = band is ScaleBand known && values.Count > 0
+            ? Scale(known.Covering(values), minSpan, lowerBound: 0, upperBound)
+            : Scale(values, minSpan, lowerBound: 0, upperBound);
         return Render(values, min, max);
     }
 
