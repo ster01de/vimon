@@ -77,7 +77,10 @@ bool redrawRequested = false;
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
 var history = MetricHistory.Empty;
+var calm = CalmView.Empty;
 SystemSnapshot? snapshot = null;
+// What the view shows: smoothed rates and steady process rows (see CalmView); the status check uses the raw snapshot.
+SystemSnapshot? shown = null;
 long nextSampleAt = 0;
 
 // Ctrl+C ends the loop normally so the alternate screen, cursor and sensors are restored and disposed.
@@ -154,15 +157,16 @@ bool SampleIfDue()
     snapshot = ReadSnapshot();
     selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
     history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
+    (shown, calm) = calm.Apply(snapshot);
     nextSampleAt = now + sampleIntervalMs;
     return true;
 }
 
 IRenderable BuildView(int width)
 {
-    var current = snapshot!;
+    var current = shown!;
     var gpu = GpuAt(current, selectedGpu);
-    var diagnostics = DiagnosticsEngine.Evaluate(current);
+    var diagnostics = DiagnosticsEngine.Evaluate(snapshot!);
 
     string clock = current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture);
 
