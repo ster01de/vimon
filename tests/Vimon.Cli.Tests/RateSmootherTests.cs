@@ -50,6 +50,20 @@ public class RateSmootherTests
     }
 
     [Fact]
+    public void KeepsDrivesWithTheSameNameApart()
+    {
+        static SystemSnapshot Twins(double seconds, double first, double second) =>
+            new(DateTimeOffset.UnixEpoch.AddSeconds(seconds), null, [], Memory,
+                [new StorageMetrics("NVMe", null) { ReadBytesPerSec = first }, new StorageMetrics("NVMe", null) { ReadBytesPerSec = second }]);
+
+        var (_, state) = RateSmoother.Empty.Apply(Twins(0, 100_000_000, 0));
+        var (shown, _) = state.Apply(Twins(0.5, 100_000_000, 0));
+
+        Assert.Equal(100_000_000, shown.Storage[0].ReadBytesPerSec);
+        Assert.Equal(0, shown.Storage[1].ReadBytesPerSec);
+    }
+
+    [Fact]
     public void ForgetsInterfacesThatAreGone()
     {
         var (_, state) = RateSmoother.Empty.Apply(Sample(0, 1_000));

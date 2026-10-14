@@ -53,7 +53,7 @@ internal sealed record RateSmoother(DateTimeOffset? LastSample, ImmutableDiction
     public (SystemSnapshot Shown, RateSmoother Next) Apply(SystemSnapshot raw)
     {
         // Null starts every rate over from its raw value.
-        double? alpha = AlphaSince(raw.Timestamp);
+        double? alpha = Continues(raw.Timestamp) ? SmoothedRate.Alpha(raw.Timestamp - LastSample!.Value) : null;
         var next = ImmutableDictionary.CreateBuilder<string, SmoothedRate>();
 
         double? Smooth(string key, double? value)
@@ -67,31 +67,34 @@ internal sealed record RateSmoother(DateTimeOffset? LastSample, ImmutableDiction
             return smoothed.Value;
         }
 
-        var network = raw.Network
-            .Select(n => n with
+        var network = WithKeys(raw.Network, n => n.Name, "net")
+            .Select(x => x.Item with
             {
-                DownBytesPerSec = Smooth($"net:{n.Name}:down", n.DownBytesPerSec),
-                UpBytesPerSec = Smooth($"net:{n.Name}:up", n.UpBytesPerSec)
+                DownBytesPerSec = Smooth($"{x.Key}:down", x.Item.DownBytesPerSec),
+                UpBytesPerSec = Smooth($"{x.Key}:up", x.Item.UpBytesPerSec)
             })
             .ToList();
 
-        var storage = raw.Storage
-            .Select(d => d with
+        var storage = WithKeys(raw.Storage, d => d.Name, "disk")
+            .Select(x => x.Item with
             {
-                ReadBytesPerSec = Smooth($"disk:{d.Name}:read", d.ReadBytesPerSec),
-                WriteBytesPerSec = Smooth($"disk:{d.Name}:write", d.WriteBytesPerSec)
+                ReadBytesPerSec = Smooth($"{x.Key}:read", x.Item.ReadBytesPerSec),
+                WriteBytesPerSec = Smooth($"{x.Key}:write", x.Item.WriteBytesPerSec)
             })
             .ToList();
 
         return (raw with { Network = network, Storage = storage }, new RateSmoother(raw.Timestamp, next.ToImmutable()));
     }
 
-    private double? AlphaSince(DateTimeOffset now)
-    {
-        if (LastSample is not DateTimeOffset last)
-            return null;
+    /// <summary>True when <paramref name="now"/> follows the previous sample closely enough to carry state over.</summary>
+    public bool Continues(DateTimeOffset now) =>
+        LastSample is DateTimeOffset last && now > last && now - last <= ResetAfter;
 
-        var elapsed = now - last;
-        return elapsed <= TimeSpan.Zero || elapsed > ResetAfter ? null : SmoothedRate.Alpha(elapsed);
-    }
+    // Two drives or adapters may share a name; the second of a name gets "#1", so each keeps its own state.
+    private static IEnumerable<(T Item, string Key)> WithKeys<T>(IReadOnlyList<T> items, Func<T, string> name, string kind) =>
+        items.Select((item, index) =>
+        {
+            int earlier = items.Take(index).Count(other => name(other) == name(item));
+            return (item, earlier == 0 ? $"{kind}:{name(item)}" : $"{kind}:{name(item)}#{earlier}");
+        });
 }

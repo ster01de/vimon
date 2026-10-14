@@ -33,6 +33,17 @@ public class CalmViewTests
         Assert.Equal(7, Calm(sample).TopProcesses[0].Pid);
     }
 
+    [Fact]
+    public void StartsTheRowsOverAfterAPause()
+    {
+        // The backend lists the busiest first: process 1 leads, then process 2 is slightly ahead.
+        var before = Copying(0, 0) with { TopProcesses = [new ProcessUsage(1, "a", 30, 0), new ProcessUsage(2, "b", 28, 0)] };
+        var after = new[] { new ProcessUsage(2, "b", 30, 0), new ProcessUsage(1, "a", 28, 0) };
+
+        Assert.Equal(1, Calm(before, Copying(0.5, 0) with { TopProcesses = after }).TopProcesses[0].Pid);
+        Assert.Equal(2, Calm(before, Copying(60, 0) with { TopProcesses = after }).TopProcesses[0].Pid);
+    }
+
     private static SystemSnapshot Calm(params SystemSnapshot[] samples)
     {
         var state = CalmView.Empty;
