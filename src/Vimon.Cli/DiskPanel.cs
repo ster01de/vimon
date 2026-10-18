@@ -36,8 +36,8 @@ internal static class DiskPanel
         // Present from the first sample on, before there is a rate, so nothing below moves when one arrives.
         if (s.Storage.Count > 0)
         {
-            rows.Add(("Read", Dashboard.Rate(read, h.DiskReadBps, theme)));
-            rows.Add(("Write", Dashboard.Rate(write, h.DiskWriteBps, theme)));
+            rows.Add(("Read", Dashboard.Rate(read, h.DiskReadBps, h.Bands.DiskReadBps, theme)));
+            rows.Add(("Write", Dashboard.Rate(write, h.DiskWriteBps, h.Bands.DiskWriteBps, theme)));
 
             if (s.ProcessScope != ProcessScope.None)
                 rows.Add(("Busiest", BusiestProcess(s.TopDiskProcesses, theme)));

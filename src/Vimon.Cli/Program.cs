@@ -77,7 +77,10 @@ bool redrawRequested = false;
 int redrawIntervalMs = mode == ViewMode.Widget ? sampleIntervalMs : frameIntervalMs;
 bool canReadKeys = !Console.IsInputRedirected;
 var history = MetricHistory.Empty;
+var calm = CalmView.Empty;
 SystemSnapshot? snapshot = null;
+// What the view shows: smoothed rates and steady process rows (see CalmView); the status check uses the raw snapshot.
+SystemSnapshot? shown = null;
 long nextSampleAt = 0;
 
 // Ctrl+C ends the loop normally so the alternate screen, cursor and sensors are restored and disposed.
@@ -153,24 +156,29 @@ bool SampleIfDue()
 
     snapshot = ReadSnapshot();
     selectedGpu = snapshot.Gpus.Count == 0 ? 0 : Math.Clamp(selectedGpu, 0, snapshot.Gpus.Count - 1);
-    history = history.Append(snapshot, GpuAt(snapshot, selectedGpu));
+    (shown, calm) = calm.Apply(snapshot);
+    // The curves follow the shown numbers, so a value and its sparkline never disagree.
+    history = history.Append(shown, GpuAt(shown, selectedGpu));
     nextSampleAt = now + sampleIntervalMs;
     return true;
 }
 
 IRenderable BuildView(int width)
 {
-    var current = snapshot!;
+    var current = shown!;
     var gpu = GpuAt(current, selectedGpu);
-    var diagnostics = DiagnosticsEngine.Evaluate(current);
+    var diagnostics = DiagnosticsEngine.Evaluate(snapshot!);
 
     string clock = current.Timestamp.ToLocalTime().ToString(timestampFormat, CultureInfo.InvariantCulture);
 
+    // A one-line TOP names the busiest process right now, not the first of the steady rows.
+    var busiestFirst = current with { TopProcesses = snapshot!.TopProcesses };
+
     if (mode == ViewMode.Widget)
-        return WidgetRenderer.Build(current, gpu, diagnostics, history, new WidgetOptions(width, clock, theme));
+        return WidgetRenderer.Build(busiestFirst, gpu, diagnostics, history, new WidgetOptions(width, clock, theme));
 
     if (mode == ViewMode.Compact)
-        return new Text(CompactRenderer.Render(current, gpu, diagnostics, selectedGpu, width));
+        return new Text(CompactRenderer.Render(busiestFirst, gpu, diagnostics, selectedGpu, width));
 
     var options = new DashboardOptions(width, hideMissing, clock, paused, theme);
     return Dashboard.Build(current, gpu, diagnostics, selectedGpu, history, options);
